@@ -9,7 +9,7 @@ header-includes:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,fig.width=12, fig.height=10)
 ```
 
 ```{r}
@@ -43,8 +43,11 @@ where $\mu(x_*) = k(x_*, x)^T(K + \sigma^2I)^{-1}y$ and $\sigma^2(x_*) = k(x_*, 
 ## Implementation
 
 ```{r}
+#Plotting two different households agains eachother over a week
 library(kernlab)
 library(tidyverse)
+
+set.seed(123)
 
 # Data cleaning
 # Sample a subset of households for plotting
@@ -73,44 +76,60 @@ irish_demand_train <- irish_demand_sample %>%
 irish_demand_test <- irish_demand_sample %>%
   filter(dateTime >= "2010-12-01")
 
-summary(irish_demand_test)
-print(house_sample)
-#Plot demand over a week for two sample households
-irish_demand_sample %>%
-  filter(dateTime >= "2010-12-01" & dateTime < "2010-12-08") %>%
-  ggplot(aes(x = dateTime, y = demand)) +
-  geom_line() +
-  facet_wrap(~house_sample, scales = "free_y") +
-  labs(title = "Electricity demand over a week for two sample households",
-       x = "Date", y = "Electricity demand (kWh)")
+house1 <-  filter(irish_demand_sample,house_sample == house_sample[1] & dateTime >= "2010-12-01" & dateTime < "2010-12-08")
+house2 <-  filter(irish_demand_sample,house_sample == house_sample[2] & dateTime >= "2010-12-01" & dateTime < "2010-12-08")
 
-irish_demand_sample %>%
-  filter(dateTime >= "2010-12-01" & dateTime < "2010-12-08") %>%
-  ggplot() +
-  geom_line(aes(x = dateTime, y = demand), color = "#ffa908") +
-  geom_line(aes(x = dateTime, y = demand), color = "#00b7ff") +
-  labs(title = "Electricity demand over time for a sample household",
-       x = "Date", y = "Electricity demand (kWh)")
+ggplot()+
+  geom_point(data = house1, aes(x = dateTime, y = demand),color = "#cc00ff")+
+  geom_point(data = house2, aes(x = dateTime, y = demand),color = "#004550")+
+  labs(title = "Electricity demand vs temperature for two sample households",
+       x = "Temperature", y = "Electricity demand (kWh)")
+```
+
+```{r,include = FALSE}
+# Plot the distribution of demand at 5 random times
+
+# Step 1: Select 5 random times
+random_times <- sample(unique(irish_demand_sample$dateTime), 3)
+
+# Step 2: Filter the data
+data_random_times <- irish_demand_sample %>% 
+  filter(dateTime %in% random_times)
+
+# Step 3: Create the histogram
+ggplot(data_random_times, aes(x = demand)) +
+  geom_histogram(binwidth = 0.5) +
+  facet_wrap(~ dateTime, scales = "free_x") +
+  labs(title = "Distribution of demand at 5 random times",
+       x = "Demand", y = "Count")
+
 ```
 
 ```{r}
+library(kernlab)
+library(dyplr)
+# Step 2: Define your training data
+x <- as.vector(house1$dateTime)
+y <- as.vector(house1$demand)
 
-neg_marginal <- function(params){
-  lambda <- params[1]
-  psi <- params[2]
-  #Compute K_n and K+lambdaI
-  K <- kernelMatrix(rbfdot(sigma = psi), x)
-  L <- K + lambda*diag(n)
-  if (det(L) == 0){
-    return(Inf)
-  }
-  #Compute alpha
-  y <- as.matrix(y)
-  alpha = solve(L,y)
-  #Compute neg log marginal likelihood
-  neg_marginal_val <- 0.5*(t(y)%*%alpha + sum(log(diag(L))))
+# Step 3: Fit the Gaussian process model
+# Use a Radial Basis Function (RBF) kernel
+gpr_model <- gausspr(x, y, kernel = "rbfdot")
 
-  return(neg_marginal_val)
-}
+# Step 4: Predict the demand for the test dataset
+# (replace `irish_demand_test$dateTime` with your actual test data)
+prediction_data <- data.frame(
+  prediction = predict(gpr_model, as.vector(irish_demand_test$dateTime))
+)
+
+house1_with_predictions <- left_join(house1, prediction_data, by = "dateTime")
+
+ggplot(house1_with_predictions, aes(x = dateTime)) +
+  geom_point(aes(y = prediction), color = "blue") +
+  geom_line(aes(y = prediction), color = "red") +
+  labs(title = "GPR model predictions",
+       x = "Date", y = "Predicted demand")
+
+print(predictions)
 ```
 
