@@ -2,8 +2,9 @@
 library(ggplot2)
 library(fpp2)
 library(slider)
+
 # Extract individual dataframes
-load("~/docs/code/SC-2-Electric-Boogalo/data/Irish.RData")
+load("~/data/Irish.RData")
 indCons <- Irish[["indCons"]]
 survey <- Irish[["survey"]]
 extra <- Irish[["extra"]]
