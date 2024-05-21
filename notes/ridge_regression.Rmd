@@ -139,6 +139,7 @@ ggplot(I1002_data %>%
          filter(dateTime >= "2010-07-04" & dateTime < "2010-07-11"),
        aes(x = dateTime, y = demand)) +
   geom_line() +
+  # geom_point(aes(color = temp)) +
   scale_x_datetime(date_breaks = "1 day") +
   theme_bw()
 
@@ -190,6 +191,7 @@ library(forecast)
 # Add Fourier terms
 fourier_daily <- fourier(ts(I1002_data$demand, frequency = 48), K = 5)
 fourier_weekly <- fourier(ts(I1002_data$demand, frequency = 48 * 7), K = 5)
+
 I1002_data_fourier <- cbind(I1002_data, fourier_daily, fourier_weekly)
 
 # Scale numeric features
@@ -233,6 +235,10 @@ I1002_mse_scaled with K = 3: 0.3998798
 K = 5 and quadratic temp: 0.3945322
 K = 5, quadratic temp, and one-hot dow: 0.3905405
 
+The fit looks better because it's at least capturing the daily fluctuations, but it's not capturing the extreme peaks.
+
+I tried adding an interaction term of temperature * hour, but this seemed to make things worse for some reason.
+
 Let's see which terms are most important:
 
 ```{r}
@@ -254,4 +260,33 @@ ggplot(coefficients_df, aes(x = reorder(feature, coefficient), y = coefficient))
   theme_bw()
 
 ```
+
+The Fourier terms are very important, as is temperature / temperature squared.
+
+## Residual analysis
+
+We can plot the residuals over time to see if there are any patterns.
+
+```{r}
+# Calculate residuals
+residuals <- I1002_test_scaled$demand - I1002_pred_scaled
+# Plot residuals over time
+ggplot(I1002_test_scaled, aes(x = dateTime, y = residuals)) +
+  geom_line() +
+  theme_bw()
+```
+
+We see that there's a pretty distinct pattern of fluctuation in the residuals over time, so something is going on here. Let's look at the residuals on an hourly basis:
+
+```{r}
+ggplot(I1002_test_scaled, aes(x = hour, y = residuals)) +
+  geom_point() +
+  # geom_smooth(method = "loess") +
+  theme_bw()
+```
+
+There appears to be something going on with the residuals around 0, which corresponds to around 12:00 given the scaling.
+
+
+
 
