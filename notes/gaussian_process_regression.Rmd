@@ -53,7 +53,7 @@ irish_demand_sample <- Irish$indCons[,Id] %>%
   bind_cols(Irish$extra) %>% # add time-related variables
   pivot_longer(cols = all_of(Id), names_to = "Id", values_to = "demand") %>%
   # Data cleaning
-  select(-time, -holy) %>%
+  select(-time, -holy) %>% # Remove time and holy columns
   # Feature engineering
   mutate(
     hour = hour(dateTime), #Hour of day
@@ -116,9 +116,6 @@ filter_by_date <- function(data,
 library(kernlab)
 library(dyplr)
 
-
-
-
 # Define a function which performs Gaussian process regression
 gaussian_process_reg <- function(data, kernel = "rbfdot",plot = FALSE) {
   x = as.vector(data$dateTime)
@@ -148,6 +145,5 @@ gaussian_process_reg(house1, plot = TRUE)$pl
 ```
 
 ```{r}
-
 gaussian_process_reg(house2, plot = TRUE)$pl
 ```
