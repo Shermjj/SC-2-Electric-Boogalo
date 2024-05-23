@@ -30,6 +30,8 @@ There are 48 observations per day per customer.
 
 # Exploratory data analysis
 
+## Temperature
+
 Let's check any relationship between temperature and demand.
 
 ```{r}
@@ -54,6 +56,45 @@ ggplot(irish_demand_sample, aes(x = temp, y = demand)) +
 
 Might be a quadratic relationship? (very noisy)
 
+## Social class
+
+Do households from different social classes happen to have different demand patterns? [This Wikipedia page](https://en.wikipedia.org/wiki/NRS_social_grade) summarises the social classes and notes that F is an additional class for farmers.
+
+```{r}
+# Get agg as in basic_lin_reg.R
+agg <- rowSums(Irish[["indCons"]])
+
+# Separate aggregates by social class
+agg_ab <- rowSums(Irish[["indCons"]][, Irish[["survey"]]$SOCIALCLASS == "AB"])
+agg_c1 <- rowSums(Irish[["indCons"]][, Irish[["survey"]]$SOCIALCLASS == "C1"])
+agg_c2 <- rowSums(Irish[["indCons"]][, Irish[["survey"]]$SOCIALCLASS == "C2"])
+agg_de <- rowSums(Irish[["indCons"]][, Irish[["survey"]]$SOCIALCLASS == "DE"])
+agg_f <- rowSums(Irish[["indCons"]][, Irish[["survey"]]$SOCIALCLASS == "F"])
+
+# Plot demand by social class
+# All-time
+# ggplot(data = extra, aes(x = time)) +
+#   # geom_line(aes(y = agg, color = "Total")) +
+#   geom_line(aes(y = agg_ab, color = "AB"), alpha = 0.5) +
+#   geom_line(aes(y = agg_c1, color = "C1"), alpha = 0.5) +
+#   geom_line(aes(y = agg_c2, color = "C2"), alpha = 0.5) +
+#   geom_line(aes(y = agg_de, color = "DE"), alpha = 0.5) +
+#   geom_line(aes(y = agg_f, color = "F"), alpha = 0.5) +
+#   theme_bw()
+
+# 1 month
+# Plot demand by social class
+ggplot(data = Irish[["extra"]][1:(48*30),], aes(x = time)) +
+  geom_line(aes(y = agg_ab[1:(48*30)], color = "AB"), alpha = 0.5) +
+  geom_line(aes(y = agg_c1[1:(48*30)], color = "C1"), alpha = 0.5) +
+  geom_line(aes(y = agg_c2[1:(48*30)], color = "C2"), alpha = 0.5) +
+  geom_line(aes(y = agg_de[1:(48*30)], color = "DE"), alpha = 0.5) +
+  geom_line(aes(y = agg_f[1:(48*30)], color = "F"), alpha = 0.5) +
+  theme_bw()
+```
+
+Class F certainly has a much different pattern than the other classes, and there are some other distinctive class differences.
+
 # Ridge regression
 
 ## Theory
@@ -72,7 +113,7 @@ List of random links that might be helpful:
 
 - [Let's Use Ridge Regression to Predict Time Series](https://abouttrading.substack.com/p/lets-use-ridge-regression-to-predict?utm_source=profile&utm_medium=reader2): application of ridge regression to time series of stock prices in Python
 
-## Application
+# Ridge regression on one household
 
 We can try running an individual ridge regression model for each household. We will use the `indCons` dataset as the response variable and the `survey` and `extra` datasets as the predictors. We will use the `glmnet` package to fit the ridge regression models.
 
@@ -285,8 +326,79 @@ ggplot(I1002_test_scaled, aes(x = hour, y = residuals)) +
   theme_bw()
 ```
 
-There appears to be something going on with the residuals around 0, which corresponds to around 12:00 given the scaling.
+There appears to be something going on with the residuals around 0, which corresponds to around 12:00PM given the scaling.
 
+# Ridge regression on total demand
 
+We can also try ridge regression on the total demand across all households.
 
+```{r}
+total_demand <- data.frame(demand = agg) %>% 
+  bind_cols(Irish[["extra"]]) %>% # add time-related variables
+  # Data cleaning
+  select(-time, -holy) %>% 
+  # Feature engineering
+  mutate(
+    hour = hour(dateTime),
+    month = month(dateTime),
+    weekend = ifelse(dow %in% c("Sat", "Sun"), 1, 0)
+  ) %>% 
+  mutate(temp_sq = temp^2) %>%  # quadratic term for temperature
+  # One-hot encode the day of the week
+  bind_cols(model.matrix(~ dow - 1, data = .)) %>% 
+  select(-dow)
+
+# Add Fourier terms
+fourier_agg_daily <- fourier(ts(total_demand$demand, frequency = 48), K = 5)
+fourier_agg_weekly <- fourier(ts(total_demand$demand, frequency = 48 * 7), K = 5)
+
+total_demand_fourier <- cbind(total_demand, fourier_agg_daily, fourier_agg_weekly)
+
+# Scale numeric features
+total_demand_scaled <- total_demand_fourier %>% 
+  mutate(across(where(is.numeric), scale))
+
+# Split the data into training and test sets
+total_demand_train_scaled <- total_demand_scaled %>% 
+  filter(dateTime < "2010-12-01") # Training set: all data before December 2010
+# Test on the last month of the dataset
+total_demand_test_scaled <- total_demand_scaled %>% 
+  filter(dateTime >= "2010-12-01")
+
+# Fit the ridge regression model
+total_demand_ridge_scaled <- cv.glmnet(as.matrix(total_demand_train_scaled %>%
+                                                   select(-demand, -dateTime)),
+                                total_demand_train_scaled$demand,
+                                family = "gaussian",
+                                alpha = 0, # Ridge regression
+                                type.measure = "mse",
+                                nfolds = 10)
+
+# Predict on the test set
+total_demand_pred_scaled <- predict(total_demand_ridge_scaled, newx = as.matrix(total_demand_test_scaled %>% select(-demand, -dateTime)))
+# Calculate MSE
+total_demand_mse_scaled <- mean((total_demand_pred_scaled - total_demand_test_scaled$demand)^2)
+print(paste("Ridge regression test error:", total_demand_mse_scaled))
+# Plot the predictions
+ggplot(total_demand_test_scaled, aes(x = dateTime, y = demand)) +
+  geom_line() +
+  geom_line(aes(y = total_demand_pred_scaled), color = "red")
+```
+
+The prediction is much better on the aggregate demand, although the predictions still never get to the high peaks in demand.
+
+Where are these peaks?
+
+```{r}
+ggplot(total_demand[1:(48*7),], aes(x = dateTime, y = demand)) +
+  geom_line() +
+  theme_bw()
+
+# Peaks occur when total demand is above 3000
+ggplot(total_demand %>% filter(demand > 3000), aes(x = hour, y = demand)) +
+  geom_point() +
+  theme_bw()
+```
+
+Most of the peaks are around 5-6 pm.
 
