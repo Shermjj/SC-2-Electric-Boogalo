@@ -95,6 +95,41 @@ ggplot(data = Irish[["extra"]][1:(48*30),], aes(x = time)) +
 
 Class F certainly has a much different pattern than the other classes, and there are some other distinctive class differences.
 
+## Seasonal patterns
+
+Let's look at the seasonal patterns in the data.
+
+```{r}
+# Plot demand for one day
+ggplot() +
+  geom_line(aes(x = 49:(48*2), y = agg[49:(48*2)])) +
+  theme_bw()
+
+# Plot demand for one week
+ggplot() +
+  geom_line(aes(x = 1:(48*7), y = agg[1:(48*7)])) +
+  theme_bw()
+ggplot() +
+  geom_line(aes(x = (48*7+1):(48*7*2), y = agg[(48*7+1):(48*7*2)])) +
+  theme_bw()
+
+# Plot demand for one month
+ggplot() +
+  geom_line(aes(x = 1:(48*30), y = agg[1:(48*30)])) +
+  theme_bw()
+ggplot() +
+  geom_line(aes(x = (48*30 + 1):(48*30*2), y = agg[(48*30 + 1):(48*30*2)])) +
+  theme_bw()
+
+# Plot all demand
+ggplot() +
+  geom_line(aes(x = 1:length(agg), y = agg)) +
+  theme_bw()
+```
+
+
+
+
 # Ridge regression
 
 ## Theory
@@ -330,6 +365,8 @@ There appears to be something going on with the residuals around 0, which corres
 
 # Ridge regression on total demand
 
+## Clean data and fit model
+
 We can also try ridge regression on the total demand across all households.
 
 ```{r}
@@ -379,21 +416,102 @@ total_demand_pred_scaled <- predict(total_demand_ridge_scaled, newx = as.matrix(
 # Calculate MSE
 total_demand_mse_scaled <- mean((total_demand_pred_scaled - total_demand_test_scaled$demand)^2)
 print(paste("Ridge regression test error:", total_demand_mse_scaled))
-# Plot the predictions
+# Plot the predictions on the test set
 ggplot(total_demand_test_scaled, aes(x = dateTime, y = demand)) +
   geom_line() +
   geom_line(aes(y = total_demand_pred_scaled), color = "red")
+
+# Plot the predictions on the last month of the training set
+total_demand_train_pred <- predict(total_demand_ridge_scaled, newx = as.matrix(total_demand_train_scaled %>% filter(dateTime >= "2010-11-01") %>% select(-demand, -dateTime)))
+ggplot(total_demand_train_scaled %>% filter(dateTime >= "2010-11-01"), aes(x = dateTime, y = demand)) +
+  geom_line() +
+  geom_line(aes(y = total_demand_train_pred), color = "red")
+# Same peak problems on the training set as on the test set
 ```
 
 The prediction is much better on the aggregate demand, although the predictions still never get to the high peaks in demand.
 
+## Seasonal patterns
+
+We have a regular fluctuation at the daily level:
+
+```{r}
+# Plot demand over day
+ggplot(total_demand, aes(x = hour, y = demand)) +
+  geom_point() +
+  geom_smooth() +
+  theme_bw()
+```
+
+There is a dip around 3:00 am, followed by a small peak around 9:00 am and a larger peak around 6:00-7:00 pm.
+
+Let's look at the weekly level:
+
+```{r}
+# Plot demand over week
+total_demand %>% 
+  mutate(day_of_week = wday(dateTime)) %>% 
+  ggplot(aes(x = day_of_week, y = demand, group = day_of_week)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+There may be some weekly fluctuation, but it isn't very clear.
+
+Let's try monthly:
+
+```{r}
+# Plot demand over month
+total_demand %>% 
+  mutate(day_of_month = day(dateTime)) %>% 
+  ggplot(aes(x = day_of_month, y = demand, group = day_of_month)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+Again, it's hard to see any major pattern.
+
+Let's check annually:
+
+```{r}
+ggplot(total_demand, aes(x = month, y = demand)) +
+  geom_point() +
+  geom_smooth() +
+  theme_bw()
+```
+
+It looks like we definitely have a dip in the summer months.
+
+## Coefficients
+
+Let's see which terms are most important:
+
+```{r}
+# Extract coefficients
+total_demand_coefs <- coef(total_demand_ridge_scaled, s = "lambda.min") %>% as.matrix()
+
+# Standardize the coefficients (multiply by the standard deviation of the corresponding feature)
+standard_deviations_total <- apply(as.matrix(total_demand_train_scaled %>% select(-demand, -dateTime)), 2, sd)
+standardized_coefficients_total <- total_demand_coefs[-1, ] * standard_deviations_total # Exclude the intercept
+
+# Plot the coefficients
+total_coefficients_df <- data.frame(
+  feature = names(standardized_coefficients_total),
+  coefficient = as.numeric(standardized_coefficients_total)
+)
+ggplot(total_coefficients_df, aes(x = reorder(feature, coefficient), y = coefficient)) +
+  geom_col() +
+  coord_flip() +
+  theme_bw()
+```
+
+The variables `tod` and `hour` have relatively large magnitude coefficients, as do `temp` and `temp_sq`. The daily Fourier terms also have relatively large coefficients, while the weekly ones do not.
+
+## Investigate peaks
+
 Where are these peaks?
 
 ```{r}
-ggplot(total_demand[1:(48*7),], aes(x = dateTime, y = demand)) +
-  geom_line() +
-  theme_bw()
-
 # Peaks occur when total demand is above 3000
 ggplot(total_demand %>% filter(demand > 3000), aes(x = hour, y = demand)) +
   geom_point() +
