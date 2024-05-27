@@ -114,6 +114,16 @@ where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes th
 
 ## Theory
 
+A gaussian process is a collection of random variables, which have a joint Gaussian distribution. A Gaussian process is completely specified by its mean function and covariance function. We build the following model:
+
+Let $y_i = f(x_i) + \varepsilon_i$, where $f(x) \sim \text{GP}(0, k(x, x'))$ and $\varepsilon_i \sim N(0, \sigma^2)$. Then we can find the posterior distribution of $f(x_*)$ given $y$ as:
+
+$$
+f(x_*) | y \sim N(\mu(x_*), \sigma^2(x_*))
+$$
+
+where $\mu(x_*) = k(x_*, x)^T(K + \sigma^2I)^{-1}y$ and $\sigma^2(x_*) = k(x_*, x_*) - k(x_*, x)^T(K + \sigma^2I)^{-1}k(x_*, x)$. In pratice, to find the posterior distribution, we maximise the marginal log-likelihood.
+ 
 ## Model
 
 ## Implementation
