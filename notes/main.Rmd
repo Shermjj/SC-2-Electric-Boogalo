@@ -1,7 +1,7 @@
 ---
 title: "SC-2 Electric Boogalo"
-subtitle: "Regression on the irish datset agregated by class"
-author: "Kieran Morris, Cecina Babich-Marrow and Sherman Kjo"
+subtitle: "Regression on the Irish datset agregated by class"
+author: "Kieran Morris, Cecina Babich Morrow and Sherman Kjo"
 output:
     pdf_document:
         toc: true
@@ -16,7 +16,78 @@ output:
 
 # Cleaning the Data
 
+## Data overview
+
+We are analyzing a set of Irish household electricity demand available from the `electBook` package. We have three datasets:
+
+- `indCons`: 16799 x 2672 matrix of individual household electricity consumption. Each column corresponds to a household and each row to a time point. Demand is observed every half hour, so there are 48 observations per day per household.
+- `survey`: 2672 row dataframe of household survey data. This dataset contains household level data on variables such as social class, renting vs. owning, appliances, etc.
+- `extra`: 16799 row dataframe of time-related variables. This dataset contains the date-time of each demand observation, time of year, day of week, time of day, whether the day was a holiday, and external temperature.
+
+```{r message = FALSE}
+# Extract individual dataframes
+library(electBook)
+library(tidyverse)
+data(Irish)
+indCons <- Irish[["indCons"]]
+survey <- Irish[["survey"]]
+extra <- Irish[["extra"]]
+```
+
 ## Loading and Structure
+
+```{r}
+# Aggregate total
+# Frequency is 30 minutes, so each day has 48 ticks
+agg <- rowSums(indCons)
+```
+
+
+## Feature engineering
+
+Based on exploratory data analysis, we created some features from the dataset to model demand.
+
+### Temperature
+
+We can visualize the relationship between temperature and the aggregate demand over time across all households:
+
+```{r}
+temp_demand <- data.frame(demand = agg) %>%
+  bind_cols(Irish[["extra"]])
+
+ggplot(temp_demand, aes(x = dateTime, y = demand, color = temp)) +
+  geom_point() +
+  viridis::scale_color_viridis(option = "magma") +
+  labs(x = "Date", y = "Total Demand", color = "Temperature") +
+  theme_bw()
+```
+
+We can see that during the warmer summer months, demand dips, although the pattern is messy. We included linear and quadratic terms for temperature in our models.
+
+### Day of the week
+
+Since we have the categorical variable day of the week for each date, we used one-hot encoding to include this information in our models.
+
+### Fourier terms
+
+We used Fourier terms to capture the patterns of seasonality in the data. Fourier terms are a set of sine and cosine functions with different frequencies that can be used to model periodic patterns. For a given period $P$, the Fourier terms are defined as follows: $$\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$$
+where $k$ is the frequency and $t$ is the time.
+
+We used Fourier terms to model the daily and annual seasonality in the data. 
+
+## Social class
+
+We wanted to investigate demand patterns across different social classes. The dataset includes 5 social classes, defined by the occupation of the head of household:
+
++ AB: managerial roles, administrative or professional
++ C1: supervisory, clerical, junior managerial
++ C2: skilled manual workers
++ DE: semi-skilled and unskilled manual workers, state pensioners, casual workers
++ F: farmers
+
+** Insert plot of demand patterns for different classes **
+
+We modeled the average demand for each social class separately.
 
 # Simple Regression 
 
@@ -24,15 +95,20 @@ output:
 
 ## Model
 
-## Implimentation
+## Implementation
 
 # Ridge Regression
 
 ## Theory
 
+Ridge regression is a method for penalized regression. Consider the model $$Y_i^0 = \alpha + \beta x_i^0 + \epsilon_i, \quad  i = 1,..., n$$
+where $\beta \in \mathbb{R}^p$, $\alpha \in \mathbb{R}$, and for all $i, l \in \{1, ..., n\}$, $\mathbb{E}[\epsilon_i] = 0$ and $\mathbb{E}[\epsilon_i \epsilon_l] = \sigma^2 \delta_{il}$ for some $\sigma^2 > 0$. Then the ridge regression estimator is defined as the minimizer of the following objective function:
+$$(\hat{\alpha}_\lambda, \hat{\beta}_\lambda) = \argmin_{\alpha \in \mathbb{R}, \beta \in \mathbb{R}^p} \lVert y^0 - \alpha - \boldsymbol{X}^0 \beta \rVert^2_2 + \lambda \lVert \beta \rVert^2_2$$
+where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes the Euclidean norm. Ridge regression is thus imposing a penalty on the size of $\beta$, with the strength of that penalty determined by the choice of $\lambda$. The coefficients will be shrunk towards zero, but will not be set to zero (as opposed to in lasso regression).
+
 ## Model
 
-## Implimentation
+## Implementation
 
 # Gaussian Process Regression
 
@@ -40,6 +116,6 @@ output:
 
 ## Model
 
-## Implimentation
+## Implementation
 
 # Results
