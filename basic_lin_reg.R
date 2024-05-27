@@ -4,7 +4,8 @@ library(fpp2)
 library(slider)
 
 # Extract individual dataframes
-load("~/data/Irish.RData")
+library(electBook)
+data(Irish)
 indCons <- Irish[["indCons"]]
 survey <- Irish[["survey"]]
 extra <- Irish[["extra"]]
@@ -25,6 +26,8 @@ agg_day <- slide_dbl(agg_hour[1:8376], ~sum(.x), .after = 23, .step=24)
 agg_day <- na.omit(agg_day)
 autoplot(ts(agg_day)) + xlab("Day") + ylab("Total Electricity Used")
 
+# Aggregate by Social class
+
 # Work with daily frequency for now
 # Deal with `extra`, keep only dow and temp (any more?) (holy is useless since no true holy? why all FALSE?)
 extra <- extra[c('dow', 'temp')]
@@ -40,6 +43,13 @@ df <- data.frame(agg_day, extra_day, temp_day)
 names(df) <- c("ele_con", "dow", "temp")
 #saveRDS(df, "./data/daily_agg_data.RDS")
 
+#print(autoplot(ts(agg[1:48*7])))
+#print(autoplot(ts(agg[1:48])))
+#print(autoplot(ts(agg_hour[1:24*3])) + xlab("Hour") + ylab("Total Electricity Used"))
+#print(autoplot(ts(agg_day)) + xlab("Day") + ylab("Total Electricity Used"))
+#print(autoplot(ts(temp_day)) + xlab("Day") + ylab("Mean Daily Temp. "))
+
+
 #Try lin. reg
-lm(ele_con ~ dow + temp, df)
+print(summary(lm(ele_con ~ dow + temp, df)))
 

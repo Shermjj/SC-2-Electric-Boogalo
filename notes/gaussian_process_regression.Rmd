@@ -15,7 +15,6 @@ knitr::opts_chunk$set(echo = TRUE,fig.width=12, fig.height=10)
 ```{r}
 # devtools::install_github("mfasiolo/electBook")
 library(electBook)
-
 data(Irish)
 
 ```
@@ -45,7 +44,7 @@ library(tidyverse)
 
 set.seed(123)
 #Seed of generic addresses to use
-Id  <- sample(colnames(Irish$indCons), 2)
+Id  <- sample(colnames(Irish$indCons), 1000,replace = FALSE)
 
 #Clean data and ammend time dependent variables
 #---------------------------------------------
@@ -53,7 +52,7 @@ irish_demand_sample <- Irish$indCons[,Id] %>%
   bind_cols(Irish$extra) %>% # add time-related variables
   pivot_longer(cols = all_of(Id), names_to = "Id", values_to = "demand") %>%
   # Data cleaning
-  select(-time, -holy) %>%
+  select(-time, -holy) %>% # Remove time and holy columns
   # Feature engineering
   mutate(
     hour = hour(dateTime), #Hour of day
@@ -115,19 +114,25 @@ filter_by_date <- function(data,
 ```{r}
 library(kernlab)
 library(dyplr)
-
-
-
+library(caret)
 
 # Define a function which performs Gaussian process regression
 gaussian_process_reg <- function(data, kernel = "rbfdot",plot = FALSE) {
-  x = as.vector(data$dateTime)
-  y = as.vector(data$demand)
+  train_indices <- createDataPartition(data$demand, p = 0.7, list = FALSE)
+  train_set <- data[train_indices, ]
+
+# Use the remaining 30% for the test set
+  test_set <- data[-train_indices, ]
+
+  x = as.vector(train_set$dateTime)
+  y = as.vector(train_set$demand)
   # Define the Gaussian process model
   gpr_model <- kernlab::gausspr(x,y, kernel = kernel)
   prediction <- data.frame(
     dateTime = data$dateTime,
     mean = predict(gpr_model, as.vector(data$dateTime)))
+  test_predictions <- predict(gpr_model,as.vector(test_set$dateTime))
+  performance <- postResample(pred = test_predictions, obs = test_set$demand)
 
   data_predict <- left_join(data, prediction, by = "dateTime")
   if (plot){
@@ -140,14 +145,51 @@ gaussian_process_reg <- function(data, kernel = "rbfdot",plot = FALSE) {
   } else {
     pl <- NULL
   }
-  return(list(data = data_predict,pl = pl))
+  return(list(model = gpr_model, data = data_predict, pl = pl,performance= performance))
 }
 
-gaussian_process_reg(house1, plot = TRUE)$pl
+#gaussian_process_reg(house1, plot = TRUE)$pl
 
 ```
 
 ```{r}
+#gaussian_process_reg(house2, plot = TRUE)$pl
+```
 
-gaussian_process_reg(house2, plot = TRUE)$pl
+We can also perform gaussian process regression on aggregated data, in this case we will aggregate by the `class` column and average the demand:
+
+```{r}
+# Join the two dataframes on the 'ID' column
+joined_df <- irish_demand_sample %>%
+  rename(ID = Id) %>%
+  inner_join(Irish$survey, by = "ID")
+
+# Split the joined dataframe by the 'SOCIALCLASS' column
+split_dfs <- split(joined_df, joined_df$SOCIALCLASS)
+
+# Now, split_dfs is a list of dataframes, one for each social class
+# You can access the dataframe for a specific social class like this:
+df_class1 <- split_dfs[["AB"]]
+df_class2 <- split_dfs[["C1"]]
+df_class3 <- split_dfs[["C2"]]
+df_class4 <- split_dfs[["DE"]]
+df_class5 <- split_dfs[["F"]]
+
+```
+
+
+
+```{r}
+#perform GPR on df_class1
+
+df_class1week <- filter(df_class1,week <= 4 & week > 1 )
+#head(df_class1week)
+
+df_class1week_agg <- df_class1week %>%
+  group_by(dateTime) %>%
+  summarise(demand = sum(demand, na.rm = TRUE))
+
+df_class1week_agg
+gaussian_process_reg(df_class1week_agg,plot= TRUE)$pl
+gaussian_process_reg(df_class1week_agg,plot= TRUE)$performance
 ```
