@@ -2,8 +2,10 @@
 library(ggplot2)
 library(fpp2)
 library(slider)
+
 # Extract individual dataframes
-load("~/docs/code/SC-2-Electric-Boogalo/data/Irish.RData")
+library(electBook)
+data(Irish)
 indCons <- Irish[["indCons"]]
 survey <- Irish[["survey"]]
 extra <- Irish[["extra"]]
@@ -53,6 +55,8 @@ df_hfhr <- data.frame(cons_by_class_halfhr)
 #Create different list of aggregation
 
 
+# Aggregate by Social class
+
 # Work with daily frequency for now
 # Deal with `extra`, keep only dow and temp (any more?) (holy is useless since no true holy? why all FALSE?)
 extra <- extra[c('dow', 'temp')]
@@ -84,6 +88,13 @@ autoplot(ts(agg_day)) + xlab("Day") + ylab("Total Electricity Used")
 
 #saveRDS(df, "./data/daily_agg_data.RDS")
 
+#print(autoplot(ts(agg[1:48*7])))
+#print(autoplot(ts(agg[1:48])))
+#print(autoplot(ts(agg_hour[1:24*3])) + xlab("Hour") + ylab("Total Electricity Used"))
+#print(autoplot(ts(agg_day)) + xlab("Day") + ylab("Total Electricity Used"))
+#print(autoplot(ts(temp_day)) + xlab("Day") + ylab("Mean Daily Temp. "))
+
+
 #Try lin. reg
-lm(ele_con ~ dow + temp, df)
+print(summary(lm(ele_con ~ dow + temp, df)))
 

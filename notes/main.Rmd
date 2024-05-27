@@ -1,0 +1,45 @@
+---
+title: "SC-2 Electric Boogalo"
+subtitle: "Regression on the irish datset agregated by class"
+author: "Kieran Morris, Cecina Babich-Marrow and Sherman Kjo"
+output:
+    pdf_document:
+        toc: true
+        toc_depth: 3
+        number_sections: true
+        fig_caption: true
+        fig_height: 4
+        fig_width: 6
+        keep_tex: true
+        latex_engine: xelatex
+---
+
+# Cleaning the Data
+
+## Loading and Structure
+
+# Simple Regression 
+
+## Theory
+
+## Model
+
+## Implimentation
+
+# Ridge Regression
+
+## Theory
+
+## Model
+
+## Implimentation
+
+# Gaussian Process Regression
+
+## Theory
+
+## Model
+
+## Implimentation
+
+# Results
