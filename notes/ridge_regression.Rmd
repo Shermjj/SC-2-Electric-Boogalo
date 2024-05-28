@@ -148,6 +148,30 @@ where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes th
 ## Half hour
 
 ```{r}
+library(Rcpp)
+sourceCpp(code = '
+          #include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericMatrix generate_fourier_terms(NumericVector time_counter, int K, double period) {
+  int n = time_counter.size();
+  NumericMatrix terms(n, 2 * K);
+  
+  for (int i = 0; i < n; ++i) {
+    for (int k = 1; k <= K; ++k) {
+      terms(i, 2 * (k - 1)) = sin(2 * M_PI * k * time_counter[i] / period);
+      terms(i, 2 * (k - 1) + 1) = cos(2 * M_PI * k * time_counter[i] / period);
+    }
+  }
+  
+  return terms;
+}
+          ')
+```
+
+
+```{r}
 # Load half hour data
 df_halfhr <- readRDS("../data/df_halfhr.RData")
 
@@ -163,20 +187,27 @@ halfhr_features <- df_halfhr %>%
   ) %>% 
   mutate(temp_sq = temp^2) %>%  # quadratic term for temperature
   # One-hot encode the day of the week
-  bind_cols(model.matrix(~ dow - 1, data = .)) %>% 
+  bind_cols(model.matrix(~ dow - 1, data = .)) %>%
   select(-dow)
 # Add Fourier terms
-fourier_agg_daily <- fourier(ts(halfhr_features$temp, frequency = 48), K = 5)
-fourier_agg_yearly <- fourier(ts(halfhr_features$temp, frequency = 48 * 365), K = 5)
-halfhr_features_fourier <- cbind(halfhr_features, fourier_agg_daily, fourier_agg_yearly)
+fourier_halfhr_daily <- generate_fourier_terms(halfhr_features$counter, K = 5, period = 48)
+colnames(fourier_halfhr_daily) <- paste0(rep(c("daily_sin_","daily_cos_"),
+                                             ncol(fourier_halfhr_daily) / 2),
+                                         rep(seq_len(ncol(fourier_halfhr_daily) / 2), each = 2))
+fourier_halfhr_yearly <- generate_fourier_terms(halfhr_features$counter, K = 5, period = 48 * 365.25)
+colnames(fourier_halfhr_yearly) <- paste0(rep(c("yearly_sin_","yearly_cos_"),
+                                             ncol(fourier_halfhr_yearly) / 2),
+                                         rep(seq_len(ncol(fourier_halfhr_yearly) / 2), each = 2))
+halfhr_features_fourier <- cbind(halfhr_features, fourier_halfhr_daily, fourier_halfhr_yearly) %>% 
+  select(-counter)
 
 # Scale input features
 halfhr_features_scaled <- halfhr_features_fourier %>% 
   mutate(across(7:ncol(halfhr_features_fourier), scale))
 
 # Split the data into training and test sets
-# 80% training set
-n_train <- round(0.8*nrow(halfhr_features_scaled))
+# 90% training set
+n_train <- round(0.9*nrow(halfhr_features_scaled))
 halfhr_features_train <- halfhr_features_scaled[1:n_train,]
 halfhr_features_test <- halfhr_features_scaled[-(1:n_train),]
 ```
@@ -185,6 +216,7 @@ Fit the models:
 
 ```{r}
 # Fit the ridge regression model
+library(glmnet)
 de_halfhr_ridge <- cv.glmnet(as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
                                 halfhr_features_train$DE,
                                 family = "gaussian",
@@ -203,6 +235,100 @@ ggplot(halfhr_features_test, aes(x = dateTime, y = DE)) +
   geom_line() +
   geom_line(aes(y = de_halfhr_pred), color = "red")
 ```
+
+Test out the Rcpp ridge regression functions:
+
+```{r}
+library(Rcpp)
+library(RcppArmadillo)
+library(RcppParallel)
+Rcpp::sourceCpp(code='
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(RcppParallel)]]
+// [[Rcpp::plugins(openmp)]]
+
+#include <RcppArmadillo.h>
+#include <RcppParallel.h>
+using namespace Rcpp;
+using namespace RcppParallel;
+
+// Function to perform ridge regression and compute CV error
+List performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambda) {
+  int n = X.n_rows, k = X.n_cols;
+  arma::mat XtX = arma::trans(X) * X;
+  arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
+  arma::mat XtX_ridge = XtX + ridgePenalty;
+  
+  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
+  arma::colvec resid = y - X * coef;
+  double sig2 = arma::as_scalar(arma::trans(resid) * resid / n); // Use n instead of (n - k) to match the usual definition of MSE
+  
+  return List::create(_["error"] = sig2, _["coefficients"] = coef);
+}
+
+// Worker for parallel computation of CV errors
+struct RidgeCVWorker : public Worker {
+  const arma::mat& X;
+  const arma::vec& y;
+  const std::vector<double>& lambda_values;
+  std::vector<List>& results;
+  
+  RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values, std::vector<List>& results)
+    : X(X), y(y), lambda_values(lambda_values), results(results) {}
+  
+  void operator()(std::size_t begin, std::size_t end) {
+    for (std::size_t i = begin; i < end; i++) {
+      double lambda = lambda_values[i];
+      List result = performRidgeRegression(X, y, lambda);
+      results[i] = result;
+    }
+  }
+};
+
+// Rcpp export to perform parallel CV
+// [[Rcpp::export]]
+List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values) {
+  std::vector<List> results(lambda_values.size());
+  RidgeCVWorker worker(X, y, lambda_values, results);
+  
+  parallelFor(0, lambda_values.size(), worker);
+  
+  // Find the index of the minimum error
+  int min_error_index = 0;
+  double min_error = as<double>(results[0]["error"]);
+  for (int i = 1; i < results.size(); ++i) {
+    double current_error = as<double>(results[i]["error"]);
+    if (current_error < min_error) {
+      min_error = current_error;
+      min_error_index = i;
+    }
+  }
+  
+  // Get the optimal lambda value
+  double optimal_lambda = lambda_values[min_error_index];
+  
+  // Get coefficients for the optimal lambda
+  arma::colvec optimal_coefs = as<arma::colvec>(results[min_error_index]["coefficients"]);
+  
+  return List::create(_["optimal_lambda"] = optimal_lambda, _["coefficients"] = optimal_coefs);
+}
+
+')
+```
+
+Try it on our data:
+
+```{r}
+lambda_values <- seq(0.01, 100, length.out = 100)
+cv_results <- parallelRidgeCV(X = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
+                             y = halfhr_features_train$DE,
+                             lambda_values = lambda_values)
+
+# Identify the optimal lambda
+optimal_lambda <- lambda_values[which.min(cv_errors)]
+print(paste("Optimal Lambda:", optimal_lambda))
+```
+
 
 
 
