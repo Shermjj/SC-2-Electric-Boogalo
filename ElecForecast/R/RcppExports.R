@@ -16,11 +16,19 @@ generate_fourier_terms <- function(time_counter, K, period) {
     .Call(`_ElecForecast_generate_fourier_terms`, time_counter, K, period)
 }
 
-parallel_ridge_cross_validation <- function(x_vars, y_var, time, daily_period, annual_period, max_K, n_folds, alpha = 0) {
-    .Call(`_ElecForecast_parallel_ridge_cross_validation`, x_vars, y_var, time, daily_period, annual_period, max_K, n_folds, alpha)
+parallel_ridge_cross_validation <- function(x_vars, y_var, time_counter, daily_period, annual_period, max_K, n_folds, alpha = 0) {
+    .Call(`_ElecForecast_parallel_ridge_cross_validation`, x_vars, y_var, time_counter, daily_period, annual_period, max_K, n_folds, alpha)
 }
 
 rcpp_hello_world <- function() {
     .Call(`_ElecForecast_rcpp_hello_world`)
+}
+
+performRidgeRegression <- function(X, y, lambda) {
+    .Call(`_ElecForecast_performRidgeRegression`, X, y, lambda)
+}
+
+parallelRidgeCV <- function(X, y, lambda_values) {
+    .Call(`_ElecForecast_parallelRidgeCV`, X, y, lambda_values)
 }
 

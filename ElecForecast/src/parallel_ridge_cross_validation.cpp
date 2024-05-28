@@ -2,8 +2,8 @@
 #ifdef _OPENMP
   #include <omp.h>
 #endif
-#include "generate_fourier_terms.h"
-#include "ridge_regression.h"
+#include "generate_fourier_terms.cpp"
+#include "ridge_regression.cpp"
 using namespace Rcpp;
 
 // Cross-validation function
