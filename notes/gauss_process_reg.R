@@ -37,16 +37,16 @@ gaussian_process_reg <- function(data, kernel = "rbfdot",plot = FALSE) {
 
 #Define a function which performs gaussian process regression via Rcpp
 gauusian_process_reg_rcpp <- function(data, kernel = "rbfdot",plot = FALSE) {
-  sourceCpp("src/gauss_process_reg.cpp")
+  sourceCpp("gauss_process_reg.cpp")
   train_index <- round(nrow(data) * 0.7)
   train_set <- data[1:train_indices, ]
   test_set <- data[(train_index + 1):nrow(data), ]
 
   x = as.vector(train_set$dateTime)
   y = as.vector(train_set$demand)
-
+  sourceRcpp("gauss_process_reg.cpp")
   # Define the Gaussian process model
-  gpr_model <- gauss_process_reg(x,y, kernel = kernel)
+  gpr_model <- gauss_process_regCpp(x,y,x, 0.2,7)
   prediction <- data.frame(
     dateTime = data$dateTime,
     mean = predict(gpr_model, as.vector(data$dateTime)))

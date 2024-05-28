@@ -1,4 +1,3 @@
-#include <Rcpp.h>
 #include <RcppArmadillo.h>
 
 // Rest of your code goes here
@@ -8,7 +7,7 @@ using namespace arma;
 
 // [[Rcpp::export]]
 
-List gauss_process_reg(arma::mat X, arma::vec y, arma::mat Xnew, double sigma2, double l) {
+List gauss_process_regCpp(arma::mat X, arma::vec y, arma::mat Xnew, double sigma2, double l) {
   int n = X.n_rows;
   int nnew = Xnew.n_rows;
   mat K = exp(-1/(2*l*l)*square(X.each_row() - X.t()));
@@ -21,13 +20,4 @@ List gauss_process_reg(arma::mat X, arma::vec y, arma::mat Xnew, double sigma2, 
   mat cov = exp(-1/(2*l*l)*square(Xnew.each_row() - Xnew.t())) - v.t() * v;
   return List::create(Named("mu") = mu, Named("cov") = cov);
 }
-
-/*** R
- * X <- matrix(rnorm(100), 50, 2)
- * y <- rnorm(50)
- * Xnew <- matrix(rnorm(100), 50, 2)
- * sigma2 <- 0.1
- * l <- 1
- * gauss_process_reg(X, y, Xnew, sigma2, l)
- */
 
