@@ -37,6 +37,8 @@ where $\mu(x_*) = k(x_*, x)^T(K + \sigma^2I)^{-1}y$ and $\sigma^2(x_*) = k(x_*, 
 
 ## Implementation
 
+
+
 ```{r}
 #Plotting two different households agains eachother over a week
 library(kernlab)
@@ -101,14 +103,7 @@ pool_data_by_catagory <- function(data, catagory = "week"){
     summarise(mean_demand = mean(demand))
 }
 
- 
-filter_by_date <- function(data,
-                            day = c(1,7),
-                            week = c(1,1),
-                            month = c(1,1) ){
-  data %>% 
-    filter()
-}
+
 
 ```
 ```{r}
@@ -127,7 +122,7 @@ gaussian_process_reg <- function(data, kernel = "rbfdot",plot = FALSE) {
   x = as.vector(train_set$dateTime)
   y = as.vector(train_set$demand)
   # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(x,y, kernel = kernel)
+  gpr_model <- kernlab::gausspr(x,y, kernel = kernel,kpar = list(sigma = 100))
   prediction <- data.frame(
     dateTime = data$dateTime,
     mean = predict(gpr_model, as.vector(data$dateTime)))
@@ -180,9 +175,12 @@ df_class5 <- split_dfs[["F"]]
 
 
 ```{r}
+library(Rcpp)
+library(RcppArmadillo)
+
 #perform GPR on df_class1
 
-df_class1week <- filter(df_class1,week <= 4 & week > 1 )
+df_class1week <- filter(df_class1,week <= 2 & week > 1 )
 #head(df_class1week)
 
 df_class1week_agg <- df_class1week %>%
@@ -192,4 +190,14 @@ df_class1week_agg <- df_class1week %>%
 df_class1week_agg
 gaussian_process_reg(df_class1week_agg,plot= TRUE)$pl
 gaussian_process_reg(df_class1week_agg,plot= TRUE)$performance
+
+sourceCpp("notes/gauss_process_reg.cpp")
+
+
+x <- as.matrix(df_class1week_agg$dateTime)
+y <- as.matrix(df_class1week_agg$demand)
+
+xnew <- as.matrix(data.frame(time = seq(min(x), max(x), length.out = 1000)))
+result <- gauss_process_regCpp(x,y,xnew,0.2,8)
+
 ```
