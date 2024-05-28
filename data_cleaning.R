@@ -1,4 +1,5 @@
 library(xts)
+library(electBook)
 
 data("Irish")
 indCons <- Irish[["indCons"]]
@@ -32,23 +33,54 @@ df_halfhr = data.frame(cons_by_class_halfhr,extra_df)
 df_halfhr = xts(df_halfhr, order.by = extra$dateTime)
 df_hr = period.apply(df_halfhr, endpoints(df_halfhr, "hours"), mean)
 df_day = period.apply(df_halfhr, endpoints(df_halfhr, "days"), mean)
-df_halfhr$dow = weekdays(index(df_halfhr))
+
+#### Half hour ####
+# Generate a complete time sequence
+complete_halfhr <- seq(from = min(index(df_halfhr)), to = max(index(df_halfhr)), by = "30 min")
+# Merge with the complete time sequence
+df_halfhr_complete <- merge(df_halfhr, xts(order.by = complete_halfhr), all = TRUE)
+# Add a counter column
+df_halfhr_complete$counter <- 1:nrow(df_halfhr_complete)
+halfhr_counter <- as.vector(df_halfhr_complete$counter[index(df_halfhr_complete) %in% index(df_halfhr)])
+
+dow_halfhr = weekdays(index(df_halfhr))
 df_halfhr = as.data.frame(df_halfhr)
-df_halfhr$dow = as.factor(df_halfhr$dow)
+df_halfhr$dow = as.factor(dow_halfhr)
+df_halfhr$counter = halfhr_counter
 cols <- names(df_halfhr)[1:7]
 df_halfhr[cols] <- lapply(df_halfhr[cols], as.numeric)
-saveRDS(df_halfhr, "df_halfhr.RData")
+saveRDS(df_halfhr, here::here("data/df_halfhr.RData"))
 
-df_hr$dow = weekdays(index(df_hr))
+#### Hour ####
+# Generate a complete time sequence
+complete_hr <- seq(from = min(index(df_hr)), to = max(index(df_hr)), by = "1 hour")
+# Merge with the complete time sequence
+df_hr_complete <- merge(df_hr, xts(order.by = complete_hr), all = TRUE)
+# Add a counter column
+df_hr_complete$counter <- 1:nrow(df_hr_complete)
+hr_counter <- as.vector(df_hr_complete$counter[index(df_hr_complete) %in% index(df_hr)])
+
+dow_hr = weekdays(index(df_hr))
 df_hr = as.data.frame(df_hr)
-df_hr$dow = as.factor(df_hr$dow)
+df_hr$dow = as.factor(dow_hr)
+df_hr$counter = hr_counter
 cols <- names(df_hr)[1:7]
 df_hr[cols] <- lapply(df_hr[cols], as.numeric)
-saveRDS(df_hr, "df_hr.RData")
+saveRDS(df_hr, here::here("data/df_hr.RData"))
 
-df_day$dow = weekdays(index(df_day))
+#### Day ####
+# Generate a complete time sequence
+complete_day <- seq(from = min(index(df_day)), to = max(index(df_day)), by = "1 DSTday")
+# Merge with the complete time sequence
+df_day_complete <- merge(df_day, xts(order.by = complete_day), all = TRUE)
+# Add a counter column
+df_day_complete$counter <- 1:nrow(df_day_complete)
+day_counter <- as.vector(df_day_complete$counter[index(df_day_complete) %in% index(df_day)])
+
+dow_day = weekdays(index(df_day))
 df_day = as.data.frame(df_day)
-df_day$dow = as.factor(df_day$dow)
+df_day$dow = as.factor(dow_day)
+df_day$counter = day_counter
 cols <- names(df_day)[1:7]
 df_day[cols] <- lapply(df_day[cols], as.numeric)
-saveRDS(df_day, "df_day.RData")
+saveRDS(df_day, here::here("data/df_day.RData"))

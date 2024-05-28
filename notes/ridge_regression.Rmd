@@ -21,12 +21,13 @@ We are using a dataset of Irish household electricity demand available from the 
 - `extra`: 16799 row dataframe of time-related variables. This dataset contains the date-time of each demand observation, time of year, day of week, time of day, whether the day was a holiday, and external temperature.
 
 ```{r}
-# devtools::install_github("mfasiolo/electBook")
+# Extract individual dataframes
 library(electBook)
 data(Irish)
+indCons <- Irish[["indCons"]]
+survey <- Irish[["survey"]]
+extra <- Irish[["extra"]]
 ```
-
-There are 48 observations per day per customer.
 
 # Exploratory data analysis
 
@@ -142,11 +143,68 @@ where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes th
 
 **Note: we are going to need to scale the input variables**
 
-## Resources
+# Ridge regression by social class
 
-List of random links that might be helpful:
+## Half hour
 
-- [Let's Use Ridge Regression to Predict Time Series](https://abouttrading.substack.com/p/lets-use-ridge-regression-to-predict?utm_source=profile&utm_medium=reader2): application of ridge regression to time series of stock prices in Python
+```{r}
+# Load half hour data
+df_halfhr <- readRDS("../data/df_halfhr.RData")
+
+# Feature engineering
+halfhr_features <- df_halfhr %>% 
+  # Rownames to column
+  rownames_to_column("dateTime") %>% 
+  mutate(dateTime = as_datetime(dateTime)) %>% 
+  # Feature engineering
+  mutate(
+    hour = hour(dateTime),
+    month = month(dateTime)
+  ) %>% 
+  mutate(temp_sq = temp^2) %>%  # quadratic term for temperature
+  # One-hot encode the day of the week
+  bind_cols(model.matrix(~ dow - 1, data = .)) %>% 
+  select(-dow)
+# Add Fourier terms
+fourier_agg_daily <- fourier(ts(halfhr_features$temp, frequency = 48), K = 5)
+fourier_agg_yearly <- fourier(ts(halfhr_features$temp, frequency = 48 * 365), K = 5)
+halfhr_features_fourier <- cbind(halfhr_features, fourier_agg_daily, fourier_agg_yearly)
+
+# Scale input features
+halfhr_features_scaled <- halfhr_features_fourier %>% 
+  mutate(across(7:ncol(halfhr_features_fourier), scale))
+
+# Split the data into training and test sets
+# 80% training set
+n_train <- round(0.8*nrow(halfhr_features_scaled))
+halfhr_features_train <- halfhr_features_scaled[1:n_train,]
+halfhr_features_test <- halfhr_features_scaled[-(1:n_train),]
+```
+
+Fit the models:
+
+```{r}
+# Fit the ridge regression model
+de_halfhr_ridge <- cv.glmnet(as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
+                                halfhr_features_train$DE,
+                                family = "gaussian",
+                                alpha = 0, # Ridge regression
+                                type.measure = "mse",
+                                nfolds = 10)
+
+# Predict on the test set
+de_halfhr_pred <- predict(de_halfhr_ridge,
+                          newx = as.matrix(halfhr_features_test[,7:ncol(halfhr_features_test)])
+                          )
+# Calculate MSE
+de_halfhr_mse <- mean((de_halfhr_pred - halfhr_features_test$DE)^2) # 0.02322218
+# Plot the predictions on the test set
+ggplot(halfhr_features_test, aes(x = dateTime, y = DE)) +
+  geom_line() +
+  geom_line(aes(y = de_halfhr_pred), color = "red")
+```
+
+
 
 # Ridge regression on one household
 
