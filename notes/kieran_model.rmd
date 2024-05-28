@@ -1,0 +1,12 @@
+---
+title: "eee"
+author: "eee"
+output: 
+    pdf_document: default
+---
+
+# model
+
+# Using Rcpp
+
+As previously discussed, in order to tune the hyperparameters for the model we need to solve a non convex optimisation problem. Which is computationally difficult, so we will make use of the C++ optimising library optim. Unfortunately as we discussed, this problem is not convex and we must use a grid search to find the optimal hyperparameters. This is where we will make use of the RcppArmadillo library to parallelise and speed up computation.

@@ -27,7 +27,7 @@ gaussian_process_reg <- function(data,
   test_set <- data[(train_index + 1):nrow(data), ]
 
   # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(as.vector(train_set$toy),
+  gpr_model <- kernlab::gausspr(as.matrix(train_set[,c("toy","temp")]),
                                 as.vector(train_set[[class]]),
                                 kernel = kernel, kpar = list(sigma = sigma))
 
@@ -60,11 +60,6 @@ gaussian_process_reg <- function(data,
               plot = pl))
 }
 
-
-#print(head(df_day))
-#print(head(df_hour))
-#print(head(df_half_hour))
-
 #Perform Gaussian Process Regression on daily data for each class
 
 all_plots <- list()
@@ -78,7 +73,7 @@ class_colours <- c("DE" = "#9900ff",
 
 for (class_name in class_names) {
   # Perform Gaussian Process Regression on the class
-  gpr_result <- gaussian_process_reg(df_hour, class = class_name, plot = TRUE)
+  gpr_result <- gaussian_process_reg(df_daily, class = class_name, plot = TRUE)
   
   # Add the plot to all_plots
   all_plots[[class_name]] <- gpr_result$plot
@@ -102,4 +97,3 @@ for (class_name in class_names) {
   # Close the .png file
   dev.off()
 }
-

@@ -103,7 +103,7 @@ We modeled the average demand for each social class separately.
 
 Ridge regression is a method for penalized regression. Consider the model $$Y_i^0 = \alpha + \beta x_i^0 + \epsilon_i, \quad  i = 1,..., n$$
 where $\beta \in \mathbb{R}^p$, $\alpha \in \mathbb{R}$, and for all $i, l \in \{1, ..., n\}$, $\mathbb{E}[\epsilon_i] = 0$ and $\mathbb{E}[\epsilon_i \epsilon_l] = \sigma^2 \delta_{il}$ for some $\sigma^2 > 0$. Then the ridge regression estimator is defined as the minimizer of the following objective function:
-$$(\hat{\alpha}_\lambda, \hat{\beta}_\lambda) = \argmin_{\alpha \in \mathbb{R}, \beta \in \mathbb{R}^p} \lVert y^0 - \alpha - \boldsymbol{X}^0 \beta \rVert^2_2 + \lambda \lVert \beta \rVert^2_2$$
+$$(\hat{\alpha}_\lambda, \hat{\beta}_\lambda) = \mathrm{argmin}_{\alpha \in \mathbb{R}, \beta \in \mathbb{R}^p} \lVert y^0 - \alpha - \boldsymbol{X}^0 \beta \rVert^2_2 + \lambda \lVert \beta \rVert^2_2$$
 where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes the Euclidean norm. Ridge regression is thus imposing a penalty on the size of $\beta$, with the strength of that penalty determined by the choice of $\lambda$. The coefficients will be shrunk towards zero, but will not be set to zero (as opposed to in lasso regression).
 
 ## Model
@@ -127,5 +127,121 @@ where $\mu(x_*) = k(x_*, x)^T(K + \sigma^2I)^{-1}y$ and $\sigma^2(x_*) = k(x_*, 
 ## Model
 
 ## Implementation
+
+For the gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate gaussian process regression, allowing us to add our additional features as covariates. By convention we will use the rbf kernel:
+
+$$
+k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
+$$
+
+where $l$ is another hyperparameter to be tuned. Below is our code which fits the gaussian process regression model to given data:
+
+```{r}
+gaussian_process_reg <- function(data,
+                                 class = "DE",
+                                 kernel = "rbfdot",
+                                 plot = FALSE,
+                                 sigma = 100) {
+
+  #Training and test set, first 90% of data is training, last 10% is test
+  train_index <- round(nrow(data) * 0.9)
+  train_set <- data[1:train_index, ]
+  test_set <- data[(train_index + 1):nrow(data), ]
+
+  # Define the Gaussian process model
+  gpr_model <- kernlab::gausspr(as.matrix(train_set[, c("toy", "temp")]),
+                                as.vector(train_set[[class]]),
+                                kernel = kernel, kpar = list(sigma = sigma))
+
+  # Predict the mean function for plotting
+  mean_func <- predict(gpr_model, as.vector(data$toy))
+  prediction <- data.frame(
+                           toy = data$toy,
+                           mean = mean_func)
+
+  data_with_pred <- left_join(data, prediction, by = "toy")
+
+  # Evaluate performance
+  test_mean_func <- predict(gpr_model, as.vector(test_set$toy))
+  performance <- postResample(pred = test_mean_func, obs = test_set$DE)
+
+  # Include Plots ?
+  if (plot){
+    pl <- ggplot(data_with_pred, aes(x = toy)) +
+      geom_point(aes(y = get(class)), color = "#414141") +
+      geom_line(aes(y = mean), color = class_colours[class]) +
+      labs(title = "GPR model predictions",
+           x = "Date", y = "Demand")
+    pl
+  } else {
+    pl <- NULL
+  }
+  return(list(model = gpr_model,
+              data <- data_with_pred,
+              performance,
+              plot = pl))
+}
+
+```
+
+
+
+Since we are working as bayesians to find the ideal hyperparameters $l$ and $\sigma$, we will minimise the negative log likelihood of the model. On one hand this skirts the issues of cross validation, but on the other hand we are left with a non convex optimisation problem. To get around this issue we outsoucre to C++, making use of the C++ optimising library optim. Then parallizing with RcppArmadillo to parallelise the optimisation over a two dimensional grid of intiial choices. Below is the `RcppArmadillo` code we used to optimise the hyperparameters:
+
+```{r}
+library(RcppArmadillo)
+sourceCpp("gaussian_process_optim.cpp")
+```
+
+where the C++ code is as follows:
+
+```{r engine = 'Rcpp', eval = FALSE}
+#include <RcppArmadillo.h>
+#include <optim.hpp>
+
+// [[Rcpp::depends(RcppArmadillo)]]
+
+// Define the RBF kernel
+arma::mat rbf_kernel(const arma::mat& X, double l, double sigma) {
+    arma::mat K = arma::zeros(X.n_rows, X.n_rows);
+    for (unsigned i = 0; i < X.n_rows; ++i) {
+        for (unsigned j = 0; j < X.n_rows; ++j) {
+            double dist = arma::norm(X.row(i) - X.row(j), 2);
+            K(i, j) = std::pow(sigma, 2) * std::exp(-std::pow(dist, 2) / (2 * std::pow(l, 2)));
+        }
+    }
+    return K;
+}
+
+// Define the negative log marginal likelihood
+double neg_log_marginal_likelihood(const arma::vec& theta, arma::vec* grad_out, void* opt_data) {
+    // Extract data and parameters
+    arma::mat X = *static_cast<arma::mat*>(opt_data);
+    arma::vec y = *static_cast<arma::vec*>(opt_data);
+    double l = theta(0);
+    double sigma = theta(1);
+
+    // Calculate the kernel matrix
+    arma::mat K = rbf_kernel(X, l, sigma);
+
+    // Calculate the log marginal likelihood
+    double log_likelihood = -0.5 * arma::as_scalar(y.t() * arma::solve(K, y)) - 0.5 * arma::log_det(K) - 0.5 * X.n_rows * std::log(2 * M_PI);
+
+    // Return the negative log marginal likelihood
+    return -log_likelihood;
+}
+
+// [[Rcpp::export]]
+arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
+    // Initial guess for the parameters
+    arma::vec theta = arma::ones(2);
+
+    // Optimise the negative log marginal likelihood
+    bool success = optim::de(theta, neg_log_marginal_likelihood, &X);
+
+    // Return the optimised parameters
+    return theta;
+}
+```
 
 # Results
