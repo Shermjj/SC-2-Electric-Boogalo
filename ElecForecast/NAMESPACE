@@ -1,4 +1,6 @@
 useDynLib(ElecForecast, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
 importFrom("stats", "as.formula", "lm")
+importFrom(RcppParallel, RcppParallelLibs)
 exportPattern("^[[:alpha:]]+")
+importFrom(RcppParallel,RcppParallelLibs)
