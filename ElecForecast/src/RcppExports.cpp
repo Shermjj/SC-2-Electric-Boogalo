@@ -24,34 +24,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// parallel_ridge_cross_validation
-NumericVector parallel_ridge_cross_validation(NumericMatrix x_vars, NumericVector y_var, NumericVector time_counter, double daily_period, double annual_period, int max_K, int n_folds, double alpha);
-RcppExport SEXP _ElecForecast_parallel_ridge_cross_validation(SEXP x_varsSEXP, SEXP y_varSEXP, SEXP time_counterSEXP, SEXP daily_periodSEXP, SEXP annual_periodSEXP, SEXP max_KSEXP, SEXP n_foldsSEXP, SEXP alphaSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type x_vars(x_varsSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type y_var(y_varSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type time_counter(time_counterSEXP);
-    Rcpp::traits::input_parameter< double >::type daily_period(daily_periodSEXP);
-    Rcpp::traits::input_parameter< double >::type annual_period(annual_periodSEXP);
-    Rcpp::traits::input_parameter< int >::type max_K(max_KSEXP);
-    Rcpp::traits::input_parameter< int >::type n_folds(n_foldsSEXP);
-    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
-    rcpp_result_gen = Rcpp::wrap(parallel_ridge_cross_validation(x_vars, y_var, time_counter, daily_period, annual_period, max_K, n_folds, alpha));
-    return rcpp_result_gen;
-END_RCPP
-}
-// rcpp_hello_world
-List rcpp_hello_world();
-RcppExport SEXP _ElecForecast_rcpp_hello_world() {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(rcpp_hello_world());
-    return rcpp_result_gen;
-END_RCPP
-}
 // performRidgeRegression
 List performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambda);
 RcppExport SEXP _ElecForecast_performRidgeRegression(SEXP XSEXP, SEXP ySEXP, SEXP lambdaSEXP) {
@@ -81,8 +53,6 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_ElecForecast_generate_fourier_terms", (DL_FUNC) &_ElecForecast_generate_fourier_terms, 3},
-    {"_ElecForecast_parallel_ridge_cross_validation", (DL_FUNC) &_ElecForecast_parallel_ridge_cross_validation, 8},
-    {"_ElecForecast_rcpp_hello_world", (DL_FUNC) &_ElecForecast_rcpp_hello_world, 0},
     {"_ElecForecast_performRidgeRegression", (DL_FUNC) &_ElecForecast_performRidgeRegression, 3},
     {"_ElecForecast_parallelRidgeCV", (DL_FUNC) &_ElecForecast_parallelRidgeCV, 3},
     {NULL, NULL, 0}

@@ -1,6 +1,5 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::depends(RcppParallel)]]
-// [[Rcpp::plugins(openmp)]]
 
 #include <RcppArmadillo.h>
 #include <RcppParallel.h>
