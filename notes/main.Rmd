@@ -64,7 +64,10 @@ We extracted the hour of the day and the month from the date-time variable. We a
 
 We can visualize the relationship between temperature and the aggregate demand over time across all households:
 
-```{r}
+```{r,eval = FALSE}
+
+agg <- colMeans(indCons)
+
 temp_demand <- data.frame(demand = agg) %>%
   bind_cols(Irish[["extra"]])
 
@@ -95,13 +98,6 @@ We centered and scaled all variables used in the models.
 
 Because this is time series data, we needed to make sure the training and testing data were both contiguous. We trained the models on the first 90% of the rows and tested on the final 10%.
 
-# Simple Regression 
-
-## Theory
-
-## Model
-
-## Implementation
 
 # Ridge Regression
 
@@ -121,7 +117,7 @@ We performed ridge regression using the model detailed above, with the following
 + Hour
 + Month
 + One-hot encoded variables for each day of the week
-+ Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K}$
++ Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K\}$
 + Annual Fourier terms likewise
 
 We had two hyperparameters to tune: the standard ridge regression parameter $\lambda$ and the maximum order of the Fourier terms included $K$. For sake of simplicity, we elected to use the same $K$ value for both the daily and the annual terms.
@@ -157,72 +153,29 @@ $$
 $$
 k^n(x) = (k(x_1^0,x),k(x_n^0,x)).
 $$
-Although if it looks scary just remember a computer can do it!
-In pratice, to find the posterior distribution, we maximise the marginal log-likelihood.
+Although if it looks scary just remember a computer can do it! This gives us a way to then model 
+
+$$Y^0 \sim \text{N}(0,K _ \lambda I_n),$$
+
+to simulate our results. 
+
+In practice, to find the posterior distribution, we maximise the marginal log-likelihood.
  
-## Model
+## Tuning hyperparameters
 
-## Implementation
-
-For the gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate gaussian process regression, allowing us to add our additional features as covariates. By convention we will use the rbf kernel:
+For our needs we will use a radial basis function kernel, which has a single hyperparemter $l$, often called the bandwidth.
 
 $$
 k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
 $$
 
-where $l$ is another hyperparameter to be tuned. Below is our code which fits the gaussian process regression model to given data:
+We also have the hyperparameter $\sigma$ which is the standard deviation of our noise. In order to find the ideal hyperparameters we will attempt to maximize the marginal log likelihood. The marginal log likelihood is given by:
 
-```{r}
-gaussian_process_reg <- function(data,
-                                 class = "DE",
-                                 kernel = "rbfdot",
-                                 plot = FALSE,
-                                 sigma = 100) {
+$$
+\log p(y^0 \mid x^0, l,\sigma^2) = -\frac{1}{2} y^0 (K + \sigma^2 I_n)^{-1} y^0 - \frac{1}{2} \log \lvert K + \sigma^2 I_n \rvert 
+$$
 
-  #Training and test set, first 90% of data is training, last 10% is test
-  train_index <- round(nrow(data) * 0.9)
-  train_set <- data[1:train_index, ]
-  test_set <- data[(train_index + 1):nrow(data), ]
-
-  # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(as.matrix(train_set[, c("toy", "temp")]),
-                                as.vector(train_set[[class]]),
-                                kernel = kernel, kpar = list(sigma = sigma))
-
-  # Predict the mean function for plotting
-  mean_func <- predict(gpr_model, as.vector(data$toy))
-  prediction <- data.frame(
-                           toy = data$toy,
-                           mean = mean_func)
-
-  data_with_pred <- left_join(data, prediction, by = "toy")
-
-  # Evaluate performance
-  test_mean_func <- predict(gpr_model, as.vector(test_set$toy))
-  performance <- postResample(pred = test_mean_func, obs = test_set$DE)
-
-  # Include Plots ?
-  if (plot){
-    pl <- ggplot(data_with_pred, aes(x = toy)) +
-      geom_point(aes(y = get(class)), color = "#414141") +
-      geom_line(aes(y = mean), color = class_colours[class]) +
-      labs(title = "GPR model predictions",
-           x = "Date", y = "Demand")
-    pl
-  } else {
-    pl <- NULL
-  }
-  return(list(model = gpr_model,
-              data <- data_with_pred,
-              performance,
-              plot = pl))
-}
-
-```
-
-
-
-Since we are working as bayesians to find the ideal hyperparameters $l$ and $\sigma$, we will minimise the negative log likelihood of the model. On one hand this skirts the issues of cross validation, but on the other hand we are left with a non convex optimisation problem. To get around this issue we outsoucre to C++, making use of the C++ optimising library optim. Then parallizing with RcppArmadillo to parallelise the optimisation over a two dimensional grid of intiial choices. Below is the `RcppArmadillo` code we used to optimise the hyperparameters:
+where we remove a constant which is irrelevant to the optimisation. Since this is computationaly intense, we outsource the optimisation to C++, and integrate it via RcppArmadillo. Below is the C++ code we used, which can also be found `gauss_process_reg.cpp`:
 
 ```{r engine = 'Rcpp', eval = FALSE}
 #include <RcppArmadillo.h>
@@ -273,6 +226,76 @@ arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
     return theta;
 }
 ```
+
+We parallize over the grid of initial choices to speed up the optimisation. As we going to be performing this on different sized datasets (half hourly, hourly and daily) it is unwise to perform parallisation over those. Instead we created an wrapper function in `R` which can take in an arbitrary dataset. We display it below but it can be found in `gauss_process_reg.R`:
+
+```{r}
+find_optimal_params <- function(X, y) {
+  # Source the C++ file
+  sourceCpp("gauss_process_reg.cpp")
+  
+  # Call the C++ function
+  theta <- optimise_gaussian_process(X, y)
+  
+  # Return the optimal parameters
+  return(theta)
+}
+
+```
+
+
+## Implementation
+
+For the gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate gaussian process regression, allowing us to add our additional features as covariates. Since we have our ideal hyperparameters $l$ and $\sigma$ for each dataset, we can now fit the gaussian process regression model fairly easily. Source code for the following can be found in `gauss_process_reg.R`:
+
+```{r}
+gaussian_process_reg <- function(data,
+                                 class = "DE",
+                                 kernel = "rbfdot",
+                                 plot = FALSE,
+                                 sigma = 100) {
+
+  #Training and test set, first 90% of data is training, last 10% is test
+  train_index <- round(nrow(data) * 0.9)
+  train_set <- data[1:train_index, ]
+  test_set <- data[(train_index + 1):nrow(data), ]
+
+  # Define the Gaussian process model
+  gpr_model <- kernlab::gausspr(as.matrix(train_set[, c("toy", "temp")]),
+                                as.vector(train_set[[class]]),
+                                kernel = kernel, kpar = list(sigma = sigma))
+
+  # Predict the mean function for plotting
+  mean_func <- predict(gpr_model, as.vector(data$toy))
+  prediction <- data.frame(
+                           toy = data$toy,
+                           mean = mean_func)
+
+  data_with_pred <- left_join(data, prediction, by = "toy")
+
+  # Evaluate performance
+  test_mean_func <- predict(gpr_model, as.vector(test_set$toy))
+  performance <- postResample(pred = test_mean_func, obs = test_set$DE)
+
+  # Include Plots ?
+  if (plot){
+    pl <- ggplot(data_with_pred, aes(x = toy)) +
+      geom_point(aes(y = get(class)), color = "#414141") +
+      geom_line(aes(y = mean), color = class_colours[class]) +
+      labs(title = "GPR model predictions",
+           x = "Date", y = "Demand")
+    pl
+  } else {
+    pl <- NULL
+  }
+  return(list(model = gpr_model,
+              data <- data_with_pred,
+              performance,
+              plot = pl))
+}
+
+```
+
 
 # Results
 

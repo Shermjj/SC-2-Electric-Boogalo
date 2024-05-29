@@ -29,26 +29,27 @@ gaussian_process_reg <- function(data,
   test_set <- data[(train_index + 1):nrow(data), ]
 
   # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(as.matrix(train_set[,c("toy","temp")]),
+  gpr_model <- kernlab::gausspr(as.vector(train_set$counter),
                                 as.vector(train_set[[class]]),
-                                kernel = kernel, kpar = list(sigma = sigma))
+                                kernel = kernel,
+                                kpar = list(sigma = sigma))
 
   # Predict the mean function for plotting
-  mean_func <- predict(gpr_model, as.vector(data$toy))
+  mean_func <- predict(gpr_model, as.vector(data$counter))
   prediction <- data.frame(
-                           toy = data$toy,
+                           counter = data$counter,
                            mean = mean_func)
 
-  data_with_pred <- left_join(data, prediction, by = "toy")
+  data_with_pred <- left_join(data, prediction, by = "counter")
 
   # Evaluate performance
-  test_mean_func <- predict(gpr_model, as.vector(test_set$toy))
+  test_mean_func <- predict(gpr_model, as.vector(test_set$counter))
   performance <- postResample(pred = test_mean_func, obs = test_set$DE)
 
   # Include Plots ?
   if (plot){
-    pl <- ggplot(data_with_pred, aes(x = toy)) +
-      geom_point(aes(y = get(class)), color = "#414141") +
+    pl <- ggplot(data_with_pred, aes(x = counter)) +
+      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.75) +
       geom_line(aes(y = mean), color = class_colours[class]) +
       labs(title = "GPR model predictions",
            x = "Date", y = "Demand")
@@ -75,15 +76,6 @@ find_optimal_params <- function(X, y) {
 }
 
 
-X <- df_day$toy
-y <- df_day$DE
-
-# Find the optimal parameters
-theta <- find_optimal_params(X, y)
-
-# Print the optimal parameters
-print(theta)
-
 
 
 #Perform Gaussian Process Regression on daily data for each class
@@ -97,19 +89,23 @@ class_colours <- c("DE" = "#9900ff",
                    "AB" = "#e7298a",
                    "F" = "#45b828")
 
+
 for (class_name in class_names) {
   # Perform Gaussian Process Regression on the class
-  gpr_result <- gaussian_process_reg(df_daily, class = class_name, plot = TRUE)
-  
+  gpr_result <- gaussian_process_reg(df_hour, class = class_name, plot = TRUE)
+  print(class_name)
+  df <- gpr_result$data
+  save(df, file = paste("data/data_gpr/df_hour_gpr_", class_name, ".RData"))
   # Add the plot to all_plots
+  #png(filename = paste("data/plots_gpr/hourly", class_name, ".png"))
+  print(gpr_result$plot)
+  #dev.off()
   all_plots[[class_name]] <- gpr_result$plot
 }
 
+
 # Combine all the plots into a single plot
-combined_plot <- patchwork::wrap_plots(all_plots, ncol = 1)
-#png(filename = "data/plots_gpr/hourlycombined.png")
+#combined_plot <- patchwork::wrap_plots(all_plots, ncol = 1)
+#png(filename = "data/plots_gpr/hourlycombinedfirsthalf.png")
 #print(combined_plot)
 #dev.off()
-
-
-
