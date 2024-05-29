@@ -64,7 +64,10 @@ We extracted the hour of the day and the month from the date-time variable. We a
 
 We can visualize the relationship between temperature and the aggregate demand over time across all households:
 
-```{r}
+```{r,eval = FALSE}
+
+agg <- colMeans(indCons)
+
 temp_demand <- data.frame(demand = agg) %>%
   bind_cols(Irish[["extra"]])
 
@@ -86,14 +89,6 @@ where $K$ is the maximum order of Fourier terms to use.
 We used Fourier terms to model the daily and annual seasonality in the data. Since our dataset is missing data for some days, we needed to adjust the $t$ used to calculate the Fourier terms to account for these gaps. In the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), we added the variable `counter` to all dataframes. This variable increments by one for each time step (half hour, hour, or day) in the dataframe, reflecting the fact that some days are missing. These `counter` variables were then used later on to generate Fourier terms for our models. We wrote an `Rcpp` function in our package called `generate_fourier_terms`, which creates a matrix of Fourier terms given a time counter variable representing $t$, the maximum order of the Fourier terms $K$, and the number of time increments in a period $P$.
 
 ## Scaling
-
-
-
-# Simple Regression 
-
-## Theory
-
-## Model
 
 ## Implementation
 
@@ -137,20 +132,100 @@ $$
 $$
 k^n(x) = (k(x_1^0,x),k(x_n^0,x)).
 $$
-Although if it looks scary just remember a computer can do it!
-In pratice, to find the posterior distribution, we maximise the marginal log-likelihood.
+Although if it looks scary just remember a computer can do it! This gives us a way to then model 
+
+$$Y^0 \sim \text{N}(0,K _ \lambda I_n),$$
+
+to simulate our results. 
+
+In practice, to find the posterior distribution, we maximise the marginal log-likelihood.
  
-## Model
+## Tuning hyperparameters
 
-## Implementation
-
-For the gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate gaussian process regression, allowing us to add our additional features as covariates. By convention we will use the rbf kernel:
+For our needs we will use a radial basis function kernel, which has a single hyperparemter $l$, often called the bandwidth.
 
 $$
 k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
 $$
 
-where $l$ is another hyperparameter to be tuned. Below is our code which fits the gaussian process regression model to given data:
+We also have the hyperparameter $\sigma$ which is the standard deviation of our noise. In order to find the ideal hyperparameters we will attempt to maximize the marginal log likelihood. The marginal log likelihood is given by:
+
+$$
+\log p(y^0 \mid x^0, l,\sigma^2) = -\frac{1}{2} y^0 (K + \sigma^2 I_n)^{-1} y^0 - \frac{1}{2} \log \lvert K + \sigma^2 I_n \rvert 
+$$
+
+where we remove a constant which is irrelevant to the optimisation. Since this is computationaly intense, we outsource the optimisation to C++, and integrate it via RcppArmadillo. Below is the C++ code we used, which can also be found `gauss_process_reg.cpp`:
+
+```{r engine = 'Rcpp', eval = FALSE}
+#include <RcppArmadillo.h>
+#include <optim.hpp>
+
+// [[Rcpp::depends(RcppArmadillo)]]
+
+// Define the RBF kernel
+arma::mat rbf_kernel(const arma::mat& X, double l, double sigma) {
+    arma::mat K = arma::zeros(X.n_rows, X.n_rows);
+    for (unsigned i = 0; i < X.n_rows; ++i) {
+        for (unsigned j = 0; j < X.n_rows; ++j) {
+            double dist = arma::norm(X.row(i) - X.row(j), 2);
+            K(i, j) = std::pow(sigma, 2) * std::exp(-std::pow(dist, 2) / (2 * std::pow(l, 2)));
+        }
+    }
+    return K;
+}
+
+// Define the negative log marginal likelihood
+double neg_log_marginal_likelihood(const arma::vec& theta, arma::vec* grad_out, void* opt_data) {
+    // Extract data and parameters
+    arma::mat X = *static_cast<arma::mat*>(opt_data);
+    arma::vec y = *static_cast<arma::vec*>(opt_data);
+    double l = theta(0);
+    double sigma = theta(1);
+
+    // Calculate the kernel matrix
+    arma::mat K = rbf_kernel(X, l, sigma);
+
+    // Calculate the log marginal likelihood
+    
+    double log_likelihood = -0.5 * arma::as_scalar(y.t() * arma::solve(K, y)) - 0.5 * arma::log_det(K + l ) - 0.5 * X.n_rows * std::log(2 * M_PI);
+
+    // Return the negative log marginal likelihood
+    return -log_likelihood;
+}
+
+// [[Rcpp::export]]
+arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
+    // Initial guess for the parameters
+    arma::vec theta = arma::ones(2);
+
+    // Optimise the negative log marginal likelihood
+    bool success = optim::de(theta, neg_log_marginal_likelihood, &X);
+
+    // Return the optimised parameters
+    return theta;
+}
+```
+
+We parallize over the grid of initial choices to speed up the optimisation. As we going to be performing this on different sized datasets (half hourly, hourly and daily) it is unwise to perform parallisation over those. Instead we created an wrapper function in `R` which can take in an arbitrary dataset. We display it below but it can be found in `gauss_process_reg.R`:
+
+```{r}
+find_optimal_params <- function(X, y) {
+  # Source the C++ file
+  sourceCpp("gauss_process_reg.cpp")
+  
+  # Call the C++ function
+  theta <- optimise_gaussian_process(X, y)
+  
+  # Return the optimal parameters
+  return(theta)
+}
+
+```
+
+
+## Implementation
+
+For the gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate gaussian process regression, allowing us to add our additional features as covariates. Since we have our ideal hyperparameters $l$ and $\sigma$ for each dataset, we can now fit the gaussian process regression model fairly easily. Source code for the following can be found in `gauss_process_reg.R`:
 
 ```{r}
 gaussian_process_reg <- function(data,
@@ -204,55 +279,6 @@ gaussian_process_reg <- function(data,
 
 Since we are working as bayesians to find the ideal hyperparameters $l$ and $\sigma$, we will minimise the negative log likelihood of the model. On one hand this skirts the issues of cross validation, but on the other hand we are left with a non convex optimisation problem. To get around this issue we outsoucre to C++, making use of the C++ optimising library optim. Then parallizing with RcppArmadillo to parallelise the optimisation over a two dimensional grid of intiial choices. Below is the `RcppArmadillo` code we used to optimise the hyperparameters:
 
-```{r engine = 'Rcpp', eval = FALSE}
-#include <RcppArmadillo.h>
-#include <optim.hpp>
-
-// [[Rcpp::depends(RcppArmadillo)]]
-
-// Define the RBF kernel
-arma::mat rbf_kernel(const arma::mat& X, double l, double sigma) {
-    arma::mat K = arma::zeros(X.n_rows, X.n_rows);
-    for (unsigned i = 0; i < X.n_rows; ++i) {
-        for (unsigned j = 0; j < X.n_rows; ++j) {
-            double dist = arma::norm(X.row(i) - X.row(j), 2);
-            K(i, j) = std::pow(sigma, 2) * std::exp(-std::pow(dist, 2) / (2 * std::pow(l, 2)));
-        }
-    }
-    return K;
-}
-
-// Define the negative log marginal likelihood
-double neg_log_marginal_likelihood(const arma::vec& theta, arma::vec* grad_out, void* opt_data) {
-    // Extract data and parameters
-    arma::mat X = *static_cast<arma::mat*>(opt_data);
-    arma::vec y = *static_cast<arma::vec*>(opt_data);
-    double l = theta(0);
-    double sigma = theta(1);
-
-    // Calculate the kernel matrix
-    arma::mat K = rbf_kernel(X, l, sigma);
-
-    // Calculate the log marginal likelihood
-    
-    double log_likelihood = -0.5 * arma::as_scalar(y.t() * arma::solve(K, y)) - 0.5 * arma::log_det(K + l ) - 0.5 * X.n_rows * std::log(2 * M_PI);
-
-    // Return the negative log marginal likelihood
-    return -log_likelihood;
-}
-
-// [[Rcpp::export]]
-arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
-    // Initial guess for the parameters
-    arma::vec theta = arma::ones(2);
-
-    // Optimise the negative log marginal likelihood
-    bool success = optim::de(theta, neg_log_marginal_likelihood, &X);
-
-    // Return the optimised parameters
-    return theta;
-}
-```
 
 # Results
 
