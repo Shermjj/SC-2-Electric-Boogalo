@@ -2,25 +2,25 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #' Fourier terms
-#'
-#' @description Generate Fourier terms
-#'
-#' @param time_counter Vector of time counter
-#' @param K Maximum order of Fourier terms
-#' @param period Number of time increments per period
-#'
-#' @return Matrix of the Fourier terms
-#' @export
-#'
-generate_fourier_terms <- function(time_counter, K, period) {
-    .Call(`_ElecForecast_generate_fourier_terms`, time_counter, K, period)
+NULL
+
+GenFT <- function(time_counter, K, period) {
+    .Call(`_ElecForecast_GenFT`, time_counter, K, period)
 }
 
-performRidgeRegression <- function(X, y, lambda) {
-    .Call(`_ElecForecast_performRidgeRegression`, X, y, lambda)
+rbf_kernel <- function(X, l, sigma) {
+    .Call(`_ElecForecast_rbf_kernel`, X, l, sigma)
 }
 
-parallelRidgeCV <- function(X, y, lambda_values) {
-    .Call(`_ElecForecast_parallelRidgeCV`, X, y, lambda_values)
+RidgeReg <- function(X, y, lambda) {
+    .Call(`_ElecForecast_RidgeReg`, X, y, lambda)
+}
+
+RidgeRegPar <- function(X, y, lambda) {
+    .Call(`_ElecForecast_RidgeRegPar`, X, y, lambda)
+}
+
+parallel_ridge_cross_validation <- function(x_vars, y_var, time_counter, daily_period, annual_period, max_K, lambda_values, n_folds) {
+    .Call(`_ElecForecast_parallel_ridge_cross_validation`, x_vars, y_var, time_counter, daily_period, annual_period, max_K, lambda_values, n_folds)
 }
 

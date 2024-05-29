@@ -1,0 +1,112 @@
+#include "RidgeReg.h"
+#include "FeatureTransform.h"
+using namespace Rcpp;
+IntegerVector which4(IntegerVector vec, int value, bool equality = true) {
+  std::vector<int> indices;
+  for (int i = 0; i < vec.size(); i++) {
+    if ((vec[i] == value) == equality) {
+      indices.push_back(i);
+    }
+  }
+  return wrap(indices); // Convert std::vector to IntegerVector
+}
+
+arma::mat convertAndProcess(Rcpp::NumericMatrix x) {
+  arma::mat y = Rcpp::as<arma::mat>(x);  // Explicit conversion
+  // Now y can be used as an arma::mat, and you can perform your operations
+  return y;
+}
+
+arma::vec makePredictions(const arma::mat& x_test, const arma::colvec& coefficients) {
+  // Assuming x_test does not already have an intercept column
+  int n_test = x_test.n_rows;
+  arma::mat x_test_with_intercept = arma::join_horiz(arma::ones<arma::vec>(n_test), x_test);
+  
+  // Calculate predictions
+  arma::vec predictions = x_test_with_intercept * coefficients;
+  return predictions;
+}
+
+// [[Rcpp::export]]
+NumericMatrix parallel_ridge_cross_validation(NumericMatrix x_vars,
+                                              NumericVector y_var,
+                                              NumericVector time_counter,
+                                              double daily_period,
+                                              double annual_period,
+                                              int max_K,
+                                              std::vector<double> lambda_values,
+                                              int n_folds) {
+  int n = time_counter.size();
+  int n_vars = x_vars.ncol();
+  int num_lambdas = lambda_values.size();
+  NumericMatrix mse_results(max_K, num_lambdas);
+  
+  // Generate Fourier terms once for the maximum K
+  NumericMatrix daily_terms = GenFT(time_counter, max_K, daily_period);
+  NumericMatrix annual_terms = GenFT(time_counter, max_K, annual_period);
+  
+  // Perform cross-validation for each K
+  for (int K = 1; K <= max_K; ++K) {
+    
+    // Combine daily terms, annual terms, and additional variables into a single matrix
+    NumericMatrix x(n, 4 * K + n_vars);
+    // Add daily and annual Fourier terms
+    for (int j = 0; j < 2 * K; ++j) {
+      x(_, j) = daily_terms(_, j);
+      x(_, j + 2 * K) = annual_terms(_, j);
+    }
+    // Add additional variables
+    for (int j = 0; j < n_vars; ++j) {
+      x(_, 4 * K + j) = x_vars(_, j);
+    }
+    
+    // Create folds
+    IntegerVector folds = sample(n_folds, n, true);
+    
+    // Loop over lambda values
+    for (int lambda_index = 0; lambda_index < num_lambdas; ++lambda_index) {
+      double lambda = lambda_values[lambda_index];
+      double total_mse = 0.0;
+      
+      for (int fold = 1; fold <= n_folds; ++fold) {
+        IntegerVector test_indices = which4(folds, fold, true);
+        IntegerVector train_indices = which4(folds, fold, false);
+        
+        NumericMatrix x_train(train_indices.size(), x.ncol());
+        NumericVector y_train(train_indices.size());
+        
+        NumericMatrix x_test(test_indices.size(), x.ncol());
+        NumericVector y_test(test_indices.size());
+        
+        // Subset training and testing data
+        for (int i = 0; i < train_indices.size(); ++i) {
+          x_train(i, _) = x(train_indices[i], _);
+          y_train[i] = y_var[train_indices[i]];
+        }
+        for (int i = 0; i < test_indices.size(); ++i) {
+          x_test(i, _) = x(test_indices[i], _);
+          y_test[i] = y_var[test_indices[i]];
+        }
+        
+        // Train model and predict
+        List model = RidgeReg(convertAndProcess(x_train), y_train, lambda);
+        arma::colvec coeffs = Rcpp::as<arma::colvec>(model["coefficients"]);
+        arma::mat x_test_arma = Rcpp::as<arma::mat>(x_test);
+        arma::vec predictions = makePredictions(x_test_arma, coeffs);
+        // Calculate MSE for this fold
+        double fold_mse = 0.0;
+        for (int i = 0; i < predictions.n_elem; ++i) {
+          fold_mse += pow(predictions[i] - y_test[i], 2);
+        }
+        fold_mse /= predictions.n_elem;
+        
+        total_mse += fold_mse;
+        }
+      
+      // Average MSE over all folds for this lambda and K
+      mse_results(K - 1, lambda_index) = total_mse / n_folds;
+    }
+  }
+  
+  return mse_results;
+}

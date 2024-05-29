@@ -1,12 +1,15 @@
 Package: ElecForecast
 Type: Package
-Title: What the Package Does in One 'Title Case' Line
+Title: Electricity Consumption Forecasting
 Version: 1.0
 Date: 2024-05-27
-Author: Your Name
-Maintainer: Your Name <your@email.com>
-Description: One paragraph description of what the package does as one or more full sentences.
+Author: Kieran, Cecina, Sherman
+Maintainer: Sherman Khoo <sherman.khoo@bristol.ac.uk>
+Description: Electricity consumption forecasting models
 License: GPL (>= 2)
 Imports: Rcpp (>= 1.0.11), RcppParallel (>= 5.1.7.9001)
 LinkingTo: Rcpp, RcppArmadillo, RcppParallel
-
+SystemRequirements: GNU make
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

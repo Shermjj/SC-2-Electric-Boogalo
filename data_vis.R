@@ -130,7 +130,7 @@ library(Rcpp)
 library(RcppArmadillo)
 library(RcppParallel)
 Rcpp::sourceCpp(code='
- // [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::plugins(openmp)]]
 
@@ -140,48 +140,66 @@ using namespace Rcpp;
 using namespace RcppParallel;
 
 // Function to perform ridge regression and compute CV error
-double performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambda) {
-    int n = X.n_rows, k = X.n_cols;
-    arma::mat XtX = arma::trans(X) * X;
-    arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
-    arma::mat XtX_ridge = XtX + ridgePenalty;
-
-    arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
-    arma::colvec resid = y - X * coef;
-    double sig2 = arma::as_scalar(arma::trans(resid) * resid / (n - k));
-    return sig2; // Using MSE as the error metric
+// [[Rcpp::export]]
+List performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambda) {
+  int n = X.n_rows, k = X.n_cols;
+  arma::mat XtX = arma::trans(X) * X;
+  arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
+  arma::mat XtX_ridge = XtX + ridgePenalty;
+  
+  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
+  arma::colvec resid = y - X * coef;
+  double sig2 = arma::as_scalar(arma::trans(resid) * resid / n); 
+  
+  return List::create(_["error"] = sig2, _["coefficients"] = coef);
 }
 
 // Worker for parallel computation of CV errors
 struct RidgeCVWorker : public Worker {
-    const arma::mat& X;
-    const arma::vec& y;
-    const std::vector<double>& lambda_values;
-    RVector<double> errors;
-
-    RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values, NumericVector errors)
-    : X(X), y(y), lambda_values(lambda_values), errors(errors) {}
-
-    void operator()(std::size_t begin, std::size_t end) {
-        for (std::size_t i = begin; i < end; i++) {
-            double lambda = lambda_values[i];
-            double error = performRidgeRegression(X, y, lambda);
-            errors[i] = error;
-        }
+  const arma::mat& X;
+  const arma::vec& y;
+  const std::vector<double>& lambda_values;
+  std::vector<List>& results;
+  
+  RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values, std::vector<List>& results)
+    : X(X), y(y), lambda_values(lambda_values), results(results) {}
+  
+  void operator()(std::size_t begin, std::size_t end) {
+    for (std::size_t i = begin; i < end; i++) {
+      double lambda = lambda_values[i];
+      List result = performRidgeRegression(X, y, lambda);
+      results[i] = result;
     }
+  }
 };
 
 // Rcpp export to perform parallel CV
 // [[Rcpp::export]]
-NumericVector parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values) {
-    NumericVector errors(lambda_values.size());
-    RidgeCVWorker worker(X, y, lambda_values, errors);
-    
-    parallelFor(0, lambda_values.size(), worker);
-    
-    return errors;
-}
-')
+List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values) {
+  std::vector<List> results(lambda_values.size());
+  RidgeCVWorker worker(X, y, lambda_values, results);
+  
+  parallelFor(0, lambda_values.size(), worker);
+  
+  // Find the index of the minimum error
+  int min_error_index = 0;
+  double min_error = as<double>(results[0]["error"]);
+  for (int i = 1; i < results.size(); ++i) {
+    double current_error = as<double>(results[i]["error"]);
+    if (current_error < min_error) {
+      min_error = current_error;
+      min_error_index = i;
+    }
+  }
+  
+  // Get the optimal lambda value
+  double optimal_lambda = lambda_values[min_error_index];
+  
+  // Get coefficients for the optimal lambda
+  arma::colvec optimal_coefs = as<arma::colvec>(results[min_error_index]["coefficients"]);
+  
+  return List::create(_["optimal_lambda"] = optimal_lambda, _["coefficients"] = optimal_coefs);
+}')
 
 # Generate example data
 set.seed(123)
@@ -198,7 +216,7 @@ print(paste("Optimal Lambda:", optimal_lambda))
 
 
 Rcpp::sourceCpp(code='
- // [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::plugins(openmp)]]
 
@@ -206,63 +224,50 @@ Rcpp::sourceCpp(code='
 #include <RcppParallel.h>
 using namespace Rcpp;
 using namespace RcppParallel;
-
-// Function to perform ridge regression on a subset of data
-double performRidgeRegression(const arma::mat& X, const arma::vec& y, const arma::uvec& train_idx, const arma::uvec& test_idx, double lambda) {
-    arma::mat X_train = X.rows(train_idx);
-    arma::vec y_train = y.elem(train_idx);
-    arma::mat X_test = X.rows(test_idx);
-    arma::vec y_test = y.elem(test_idx);
-
-    int n = X_train.n_rows, k = X_train.n_cols;
-    arma::mat XtX = arma::trans(X_train) * X_train;
-    arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
-    arma::mat XtX_ridge = XtX + ridgePenalty;
-
-    arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X_train) * y_train);
-    arma::vec preds = X_test * coef;
-    double mse = mean(square(preds - y_test));
-    return mse;
-}
-
-// Worker for parallel computation of CV errors using forward chaining
-struct RidgeCVWorker : public Worker {
+struct MatrixMultiplier : public Worker {
+    // Inputs
     const arma::mat& X;
-    const arma::vec& y;
-    const std::vector<double>& lambda_values;
-    const std::vector<arma::uvec>& train_indices;
-    const std::vector<arma::uvec>& test_indices;
-    RVector<double> errors;
+    arma::mat& XtX;
 
-    RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values,
-                  const std::vector<arma::uvec>& train_indices, const std::vector<arma::uvec>& test_indices, NumericVector errors)
-    : X(X), y(y), lambda_values(lambda_values), train_indices(train_indices), test_indices(test_indices), errors(errors) {}
+    // Constructor
+    MatrixMultiplier(const arma::mat& X, arma::mat& XtX) : X(X), XtX(XtX) {}
 
+    // Parallel operator
     void operator()(std::size_t begin, std::size_t end) {
-        for (std::size_t i = begin; i < end; i++) {
-            double lambda = lambda_values[i];
-            double total_mse = 0.0;
-            for (size_t j = 0; j < train_indices.size(); ++j) {
-                double mse = performRidgeRegression(X, y, train_indices[j], test_indices[j], lambda);
-                total_mse += mse;
+        for (std::size_t i = begin; i < end; ++i) {
+            for (size_t j = 0; j < X.n_cols; ++j) {
+                for (size_t k = 0; k < X.n_rows; ++k) {
+                    XtX(i, j) += X(k, i) * X(k, j);
+                }
             }
-            errors[i] = total_mse / train_indices.size(); // Average MSE over all folds
         }
     }
 };
-
-// Rcpp export to perform parallel CV with forward chaining
 // [[Rcpp::export]]
-NumericVector parallelRidgeCVTimeSeries(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values,
-                                        std::vector<arma::uvec> train_indices, std::vector<arma::uvec> test_indices) {
-    NumericVector errors(lambda_values.size());
-    RidgeCVWorker worker(X, y, lambda_values, train_indices, test_indices, errors);
-    
-    parallelFor(0, lambda_values.size(), worker);
-    
-    return errors;
-}
-')
+List performRidgeRegressionParallel(const arma::mat& X, const arma::vec& y, double lambda) {
+    int n = X.n_rows, k = X.n_cols;
+
+    // Prepare to calculate XtX in parallel
+    arma::mat XtX = arma::zeros<arma::mat>(k, k);
+    MatrixMultiplier multiplier(X, XtX);
+    parallelFor(0, k, multiplier);
+
+    // Add the ridge penalty
+    arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
+    arma::mat XtX_ridge = XtX + ridgePenalty;
+
+    // Solve for coefficients
+    arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
+    arma::colvec resid = y - X * coef;
+    double sig2 = arma::as_scalar(arma::trans(resid) * resid / n);
+
+    return List::create(Named("error") = sig2, Named("coefficients") = coef);
+}')
+
+X <- matrix(rnorm(100 * 10), ncol=10)
+y <- rnorm(100)
+lambda <- 0.5
+performRidgeRegressionParallel(X,y, lambda)
 
 
 # Generate example time-series data
@@ -285,3 +290,31 @@ cv_errors <- parallelRidgeCVTimeSeries(X, y, lambda_values, train_indices, test_
 # Identify the optimal lambda
 optimal_lambda <- lambda_values[which.min(cv_errors)]
 print(paste("Optimal Lambda:", optimal_lambda))
+
+
+
+Rcpp:sourceCpp(code = '
+#include <RcppArmadillo.h>
+
+// Rest of your code goes here
+// [[Rcpp::depends(RcppArmadillo)]]
+using namespace Rcpp;
+using namespace arma;
+
+// [[Rcpp::export]]
+
+List gauss_process_regCpp(arma::mat X, arma::vec y, arma::mat Xnew, double sigma2, double l) {
+  int n = X.n_rows;
+  int nnew = Xnew.n_rows;
+  mat K = exp(-1/(2*l*l)*square(X.each_row() - X.t()));
+  K.diag() += sigma2;
+  mat L = chol(K);
+  vec alpha = solve(trimatl(L), solve(trimatu(L), y));
+  mat Knew = exp(-1/(2*l*l)*square(X.each_row() - Xnew.t()));
+  vec mu = Knew.t() * alpha;
+  mat v = solve(trimatu(L), Knew);
+  mat cov = exp(-1/(2*l*l)*square(Xnew.each_row() - Xnew.t())) - v.t() * v;
+  return List::create(Named("mu") = mu, Named("cov") = cov);
+}
+')
+
