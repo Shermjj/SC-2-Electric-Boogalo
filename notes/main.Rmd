@@ -134,15 +134,31 @@ We implemented ridge regression using `RcppArmadillo`. To select $\lambda$, we u
 
 ## Theory
 
-A gaussian process is a collection of random variables, which have a joint Gaussian distribution. A Gaussian process is completely specified by its mean function and covariance function. We build the following model:
-
-Let $y_i = f(x_i) + \varepsilon_i$, where $f(x) \sim \text{GP}(0, k(x, x'))$ and $\varepsilon_i \sim N(0, \sigma^2)$. Then we can find the posterior distribution of $f(x_*)$ given $y$ as:
+A gaussian process $W = (W(x))_{x \in \mathcal{X}}$ is a collection of random variables, which have a joint Gaussian distribution. One useful fact is that a Gaussian process is completely specified by its mean ($\mu:\mathcal{X} \rightarrow \mathbb{R}$) and covariance ($k:\mathcal{X}^2 \rightarrow \mathbb{R}$) functions - meaning the objective of GPR is to obtain the mean and covariance. This allows us to express any finite collection of $W$ as follows:
 
 $$
-f(x_*) | y \sim N(\mu(x_*), \sigma^2(x_*))
+(W(x_1), W(x_2), ..., W(x_n)) \sim N((\mu(x_1),...\mu(x_n)), (k(x_i,x_j))_{ij})
 $$
 
-where $\mu(x_*) = k(x_*, x)^T(K + \sigma^2I)^{-1}y$ and $\sigma^2(x_*) = k(x_*, x_*) - k(x_*, x)^T(K + \sigma^2I)^{-1}k(x_*, x)$. In pratice, to find the posterior distribution, we maximise the marginal log-likelihood.
+We build the following model:
+
+Let $y_i = f(x_i) + \varepsilon_i$, where $\varepsilon_i \sim N(0, \sigma^2)$ and we let $f$ be a gaussian process. It can be shown that 
+
+$$
+f \mid y^0 \sim \text{GP}(f_n,k_n)
+$$
+
+where $$f_n(x) = k^n(x)^T(K + \sigma^2I_n)^{-1}y^0,$$ $$k(x,x*) = k(x, x^*) - k^n(x)^T (K + \sigma^2 I_n)^{-1} k^n(x^*)$$ and 
+
+$$
+K = (k(x_i^0,x_j^0))_{ij}
+$$
+
+$$
+k^n(x) = (k(x_1^0,x),k(x_n^0,x)).
+$$
+Although if it looks scary just remember a computer can do it!
+In pratice, to find the posterior distribution, we maximise the marginal log-likelihood.
  
 ## Model
 
@@ -208,13 +224,6 @@ gaussian_process_reg <- function(data,
 
 Since we are working as bayesians to find the ideal hyperparameters $l$ and $\sigma$, we will minimise the negative log likelihood of the model. On one hand this skirts the issues of cross validation, but on the other hand we are left with a non convex optimisation problem. To get around this issue we outsoucre to C++, making use of the C++ optimising library optim. Then parallizing with RcppArmadillo to parallelise the optimisation over a two dimensional grid of intiial choices. Below is the `RcppArmadillo` code we used to optimise the hyperparameters:
 
-```{r}
-library(RcppArmadillo)
-sourceCpp("gaussian_process_optim.cpp")
-```
-
-where the C++ code is as follows:
-
 ```{r engine = 'Rcpp', eval = FALSE}
 #include <RcppArmadillo.h>
 #include <optim.hpp>
@@ -245,7 +254,8 @@ double neg_log_marginal_likelihood(const arma::vec& theta, arma::vec* grad_out, 
     arma::mat K = rbf_kernel(X, l, sigma);
 
     // Calculate the log marginal likelihood
-    double log_likelihood = -0.5 * arma::as_scalar(y.t() * arma::solve(K, y)) - 0.5 * arma::log_det(K) - 0.5 * X.n_rows * std::log(2 * M_PI);
+    
+    double log_likelihood = -0.5 * arma::as_scalar(y.t() * arma::solve(K, y)) - 0.5 * arma::log_det(K + l ) - 0.5 * X.n_rows * std::log(2 * M_PI);
 
     // Return the negative log marginal likelihood
     return -log_likelihood;
@@ -265,3 +275,4 @@ arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
 ```
 
 # Results
+
