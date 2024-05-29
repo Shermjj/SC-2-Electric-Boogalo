@@ -279,13 +279,12 @@ Now test the parallel version:
 ```{r}
 Rcpp::sourceCpp(code='
 // [[Rcpp::depends(RcppArmadillo)]]
-// [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::plugins(openmp)]]
 
 #include <RcppArmadillo.h>
-#include <RcppParallel.h>
+#include <omp.h>
+
 using namespace Rcpp;
-using namespace RcppParallel;
 
 // Function to perform ridge regression and compute CV error
 // [[Rcpp::export]]
@@ -308,15 +307,67 @@ List performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambd
   
   return List::create(_["error"] = sig2, _["coefficients"] = coef);
 }
+
+// Function to perform k-fold cross-validation
+// [[Rcpp::export]]
+List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values, int n_folds) {
+  int n = X.n_rows;
+  int num_lambdas = lambda_values.size();
+  std::vector<double> cv_errors(num_lambdas, 0.0);
+  
+#pragma omp parallel for
+  for (int i = 0; i < num_lambdas; i++) {
+    double lambda = lambda_values[i];
+    double cv_error = 0.0;
+    
+    // Create folds
+    IntegerVector folds = sample(n_folds, n, true);
+    
+    // Perform k-fold cross-validation
+    for (int fold = 1; fold <= n_folds; ++fold) {
+      IntegerVector test_indices = which(folds == fold);
+      IntegerVector train_indices = which(folds != fold);
+      
+      NumericMatrix x_train(train_indices.size(), x.ncol());
+      NumericVector y_train(train_indices.size());
+      NumericMatrix x_test(test_indices.size(), x.ncol());
+      NumericVector y_test(test_indices.size());
+      
+      List result = performRidgeRegression(X_train, y_train, lambda);
+      arma::colvec coef = as<arma::colvec>(result["coefficients"]);
+      
+      // Add intercept to the test set
+      arma::mat x_test_with_intercept = arma::join_horiz(arma::ones<arma::vec>(x_test.n), x_test);
+      arma::vec y_pred = x_test_with_intercept * coef;
+      cv_error += arma::mean(arma::square(y_test - y_pred));
+    }
+    
+    // Store the average CV error
+    cv_errors[i] = cv_error / n_folds;
+  }
+  
+  // Find the index of the minimum error
+  int min_error_index = std::distance(cv_errors.begin(), std::min_element(cv_errors.begin(), cv_errors.end()));
+  double optimal_lambda = lambda_values[min_error_index];
+  
+  // Get coefficients for the optimal lambda
+  List optimal_result = performRidgeRegression(X, y, optimal_lambda);
+  arma::colvec optimal_coefs = as<arma::colvec>(optimal_result["coefficients"]);
+  
+  return List::create(Named("optimal_lambda") = optimal_lambda, Named("coefficients") = optimal_coefs);
+}
 ')
 ```
 
 
 ```{r}
 lambda_values <- seq(0.01, 100, length.out = 100)
-cv_results <- parallelRidgeCV(X = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
-                             y = halfhr_features_train$DE,
-                             lambda_values = lambda_values)
+cv_results <- parallelRidgeCV(
+  X = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
+  y = halfhr_features_train$DE,
+  lambda_values = lambda_values,
+  n_folds = 10
+)
 
 # Identify the optimal lambda
 optimal_lambda <- lambda_values[which.min(cv_errors)]

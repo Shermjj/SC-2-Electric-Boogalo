@@ -85,9 +85,15 @@ where $K$ is the maximum order of Fourier terms to use.
 
 We used Fourier terms to model the daily and annual seasonality in the data. Since our dataset is missing data for some days, we needed to adjust the $t$ used to calculate the Fourier terms to account for these gaps. In the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), we added the variable `counter` to all dataframes. This variable increments by one for each time step (half hour, hour, or day) in the dataframe, reflecting the fact that some days are missing. These `counter` variables were then used later on to generate Fourier terms for our models. We wrote an `Rcpp` function in our package called `generate_fourier_terms`, which creates a matrix of Fourier terms given a time counter variable representing $t$, the maximum order of the Fourier terms $K$, and the number of time increments in a period $P$.
 
+**Insert example of `generate_fourier_terms` function**
+
 ## Scaling
 
+We centered and scaled all variables used in the models.
 
+## Training and testing
+
+Because this is time series data, we needed to make sure the training and testing data were both contiguous. We trained the models on the first 90% of the rows and tested on the final 10%.
 
 # Simple Regression 
 
@@ -108,7 +114,21 @@ where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes th
 
 ## Model
 
+We performed ridge regression using the model detailed above, with the following input variables:
+
++ Temperature and squared temperature
++ Time of year
++ Hour
++ Month
++ One-hot encoded variables for each day of the week
++ Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K}$
++ Annual Fourier terms likewise
+
+We had two hyperparameters to tune: the standard ridge regression parameter $\lambda$ and the maximum order of the Fourier terms included $K$. For sake of simplicity, we elected to use the same $K$ value for both the daily and the annual terms.
+
 ## Implementation
+
+We implemented ridge regression using `RcppArmadillo`. To select $\lambda$, we used $k$-fold cross-validation, also implemented in `RcppArmadillo` using `RcppParallel` to parallelise the cross-validation process. These functions can be found in our package in the [`ridge_regression.h` file](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast/src/ridge_regression.h).
 
 # Gaussian Process Regression
 

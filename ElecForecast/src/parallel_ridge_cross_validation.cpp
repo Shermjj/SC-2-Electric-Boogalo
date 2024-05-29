@@ -14,11 +14,13 @@ NumericVector parallel_ridge_cross_validation(NumericMatrix x_vars,
                                               double daily_period,
                                               double annual_period,
                                               int max_K,
+                                              std::vector<double> lambda_values,
                                               int n_folds, 
                                               double alpha = 0) {
   NumericVector mse(max_K);
   int n = time_counter.size();
   int n_vars = x_vars.ncol();
+  int num_lambdas = lambda_values.size();
   
   // Generate Fourier terms once for the maximum K
   NumericMatrix daily_terms = generate_fourier_terms(time_counter, max_K, daily_period);
@@ -68,9 +70,12 @@ NumericVector parallel_ridge_cross_validation(NumericMatrix x_vars,
         y_test[i] = y_var(test_indices[i], 0);
       }
       
-      // Fit ridge regression model using glmnet
-      List model = cv_glmnet(x_train, y_train, alpha);
-      NumericVector predictions = predict_glmnet(model, x_test, "lambda.min");
+      // Loop over lambda values
+      for (int i = 0; i < num_lambdas; ++i) {
+        double lambda_i = lambda_values[i];
+        List model = performRidgeRegression(x_train, y_train, lambda_i);
+        NumericVector predictions = x_test * model["coefficients"];
+      }
       
       double fold_mse = 0.0;
       for (int i = 0; i < predictions.size(); ++i) {

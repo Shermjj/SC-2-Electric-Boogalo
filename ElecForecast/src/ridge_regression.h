@@ -34,25 +34,48 @@ struct RidgeCVWorker : public Worker {
   const arma::mat& X;
   const arma::vec& y;
   const std::vector<double>& lambda_values;
+  const int n_folds;
   std::vector<List>& results;
   
-  RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values, std::vector<List>& results)
-    : X(X), y(y), lambda_values(lambda_values), results(results) {}
+  RidgeCVWorker(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values, int n_folds, std::vector<List>& results)
+    : X(X), y(y), lambda_values(lambda_values), n_folds(n_folds), results(results) {}
   
   void operator()(std::size_t begin, std::size_t end) {
     for (std::size_t i = begin; i < end; i++) {
       double lambda = lambda_values[i];
-      List result = performRidgeRegression(X, y, lambda);
-      results[i] = result;
+      double cv_error = 0.0;
+      
+      // Perform k-fold cross-validation
+      for (int fold = 0; fold < n_folds; fold++) {
+        arma::uvec test_indices = arma::regspace<arma::uvec>(fold, n_folds, X.n_rows - 1);
+        arma::uvec train_indices = arma::find(arma::linspace<arma::uvec>(0, X.n_rows - 1, X.n_rows) != test_indices);
+        
+        arma::mat X_train = X.rows(train_indices);
+        arma::vec y_train = y.elem(train_indices);
+        arma::mat X_test = X.rows(test_indices);
+        arma::vec y_test = y.elem(test_indices);
+        
+        List result = performRidgeRegression(X_train, y_train, lambda);
+        arma::colvec coef = as<arma::colvec>(result["coefficients"]);
+        
+        // Add intercept to the test set
+        arma::mat X_test_with_intercept = arma::join_horiz(arma::ones<arma::vec>(X_test.n_rows), X_test);
+        arma::vec y_pred = X_test_with_intercept * coef;
+        cv_error += arma::mean(arma::square(y_test - y_pred));
+      }
+      
+      // Store the average CV error
+      cv_error /= n_folds;
+      results[i] = List::create(Named("error") = cv_error, Named("lambda") = lambda);
     }
   }
 };
 
 // Rcpp export to perform parallel CV
 // [[Rcpp::export]]
-List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values) {
+List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values, int n_folds) {
   std::vector<List> results(lambda_values.size());
-  RidgeCVWorker worker(X, y, lambda_values, results);
+  RidgeCVWorker worker(X, y, lambda_values, n_folds, results);
   
   parallelFor(0, lambda_values.size(), worker);
   
@@ -71,7 +94,8 @@ List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double>
   double optimal_lambda = lambda_values[min_error_index];
   
   // Get coefficients for the optimal lambda
-  arma::colvec optimal_coefs = as<arma::colvec>(results[min_error_index]["coefficients"]);
+  List optimal_result = performRidgeRegression(X, y, optimal_lambda);
+  arma::colvec optimal_coefs = as<arma::colvec>(optimal_result["coefficients"]);
   
-  return List::create(_["optimal_lambda"] = optimal_lambda, _["coefficients"] = optimal_coefs);
+  return List::create(Named("optimal_lambda") = optimal_lambda, Named("coefficients") = optimal_coefs);
 }
