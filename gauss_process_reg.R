@@ -2,6 +2,8 @@ library(kernlab)
 library(dplyr)
 library(caret)
 library(ggplot2)
+library(Rcpp)
+library(RcppArmadillo)
 
 #Import dataframes for daily, hourly, and half-hourly data
 df_half_hour <- readRDS("data/df_halfhr.RData")
@@ -19,7 +21,7 @@ gaussian_process_reg <- function(data,
                                  class = "DE",
                                  kernel = "rbfdot",
                                  plot = FALSE,
-                                 sigma = 100) {
+                                 sigma = 1000) {
 
   #Training and test set, first 90% of data is training, last 10% is test
   train_index <- round(nrow(data) * 0.9)
@@ -60,6 +62,21 @@ gaussian_process_reg <- function(data,
               plot = pl))
 }
 
+
+find_optimal_params <- function(X, y) {
+  # Source the C++ file
+  sourceCpp("gauss_process_reg.cpp")
+  
+  # Call the C++ function
+  theta <- optimise_gaussian_process(X, y)
+  
+  # Return the optimal parameters
+  return(theta)
+}
+
+
+
+
 #Perform Gaussian Process Regression on daily data for each class
 
 all_plots <- list()
@@ -81,19 +98,9 @@ for (class_name in class_names) {
 
 # Combine all the plots into a single plot
 combined_plot <- patchwork::wrap_plots(all_plots, ncol = 1)
-png(filename = "data/plots_gpr/hourlycombined.png")
-print(combined_plot)
-dev.off()
+#png(filename = "data/plots_gpr/hourlycombined.png")
+#print(combined_plot)
+#dev.off()
 
 
-# Save daily plots
-for (class_name in class_names) {
-  # Create a new .png file
-  png(filename = paste0("data/plots_gpr/hourly_", class_name, ".png"))
-  
-  # Print the plot to the .png file
-  print(all_plots[[class_name]])
-  
-  # Close the .png file
-  dev.off()
-}
+
