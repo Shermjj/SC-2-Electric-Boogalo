@@ -24,7 +24,7 @@ df_halfhr_features <- df_halfhr %>%
   select(-dow)
 # Scaled
 df_halfhr_scaled <- df_halfhr_features %>% 
-  mutate(across(-c(dateTime, counter), scale))
+  mutate(across(-c(dateTime, counter), ~ as.vector(scale(.))))
 saveRDS(df_halfhr_scaled, here::here("data/df_halfhr_scaled.RData"))
 
 #### Hour ####
@@ -43,7 +43,7 @@ df_hr_features <- df_hr %>%
   select(-dow)
 # Scaled
 df_hr_scaled <- df_hr_features %>% 
-  mutate(across(-c(dateTime, counter), scale))
+  mutate(across(-c(dateTime, counter), ~ as.vector(scale(.))))
 saveRDS(df_hr_scaled, here::here("data/df_hr_scaled.RData"))
 
 #### Day ####
@@ -62,6 +62,6 @@ df_day_features <- df_day %>%
   select(-dow)
 # Scaled
 df_day_scaled <- df_day_features %>% 
-  mutate(across(-c(dateTime, counter), scale))
+  mutate(across(-c(dateTime, counter), ~ as.vector(scale(.))))
 saveRDS(df_day_scaled, here::here("data/df_day_scaled.RData"))
 
