@@ -38,14 +38,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // parallelRidgeCV
-List parallelRidgeCV(const arma::mat& X, const arma::vec& y, std::vector<double> lambda_values);
+List parallelRidgeCV(const arma::mat& X, const arma::vec& y, const std::vector<double>& lambda_values);
 RcppExport SEXP _ElecForecast_parallelRidgeCV(SEXP XSEXP, SEXP ySEXP, SEXP lambda_valuesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< std::vector<double> >::type lambda_values(lambda_valuesSEXP);
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type lambda_values(lambda_valuesSEXP);
     rcpp_result_gen = Rcpp::wrap(parallelRidgeCV(X, y, lambda_values));
     return rcpp_result_gen;
 END_RCPP
