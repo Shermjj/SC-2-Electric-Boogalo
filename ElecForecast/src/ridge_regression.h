@@ -10,13 +10,20 @@ using namespace RcppParallel;
 // Function to perform ridge regression and compute CV error
 // [[Rcpp::export]]
 List performRidgeRegression(const arma::mat& X, const arma::vec& y, double lambda) {
-  int n = X.n_rows, k = X.n_cols;
-  arma::mat XtX = arma::trans(X) * X;
+  int n = X.n_rows;
+  int k = X.n_cols + 1; // adding one column for the intercept
+  
+  // Add a column of ones to X for the intercept
+  arma::mat X_with_intercept = arma::join_horiz(arma::ones<arma::vec>(n), X);
+  
+  // Compute XtX and XtY
+  arma::mat XtX = arma::trans(X_with_intercept) * X_with_intercept;
   arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
+  ridgePenalty(0, 0) = 0; // Do not penalize the intercept term
   arma::mat XtX_ridge = XtX + ridgePenalty;
   
-  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
-  arma::colvec resid = y - X * coef;
+  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X_with_intercept) * y);
+  arma::colvec resid = y - X_with_intercept * coef;
   double sig2 = arma::as_scalar(arma::trans(resid) * resid / n); 
   
   return List::create(_["error"] = sig2, _["coefficients"] = coef);
