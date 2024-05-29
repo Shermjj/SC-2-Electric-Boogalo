@@ -117,7 +117,7 @@ We performed ridge regression using the model detailed above, with the following
 + Hour
 + Month
 + One-hot encoded variables for each day of the week
-+ Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K}$
++ Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K\}$
 + Annual Fourier terms likewise
 
 We had two hyperparameters to tune: the standard ridge regression parameter $\lambda$ and the maximum order of the Fourier terms included $K$. For sake of simplicity, we elected to use the same $K$ value for both the daily and the annual terms.
@@ -295,10 +295,6 @@ gaussian_process_reg <- function(data,
 }
 
 ```
-
-
-
-Since we are working as bayesians to find the ideal hyperparameters $l$ and $\sigma$, we will minimise the negative log likelihood of the model. On one hand this skirts the issues of cross validation, but on the other hand we are left with a non convex optimisation problem. To get around this issue we outsoucre to C++, making use of the C++ optimising library optim. Then parallizing with RcppArmadillo to parallelise the optimisation over a two dimensional grid of intiial choices. Below is the `RcppArmadillo` code we used to optimise the hyperparameters:
 
 
 # Results

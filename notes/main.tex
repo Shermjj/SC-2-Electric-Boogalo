@@ -271,26 +271,25 @@ Fourier terms given a time counter variable representing \(t\), the
 maximum order of the Fourier terms \(K\), and the number of time
 increments in a period \(P\).
 
+\textbf{Insert example of \texttt{generate\_fourier\_terms} function}
+
 \hypertarget{scaling}{%
 \subsection{Scaling}\label{scaling}}
 
-\hypertarget{simple-regression}{%
-\section{Simple Regression}\label{simple-regression}}
+We centered and scaled all variables used in the models.
 
-\hypertarget{theory}{%
-\subsection{Theory}\label{theory}}
+\hypertarget{training-and-testing}{%
+\subsection{Training and testing}\label{training-and-testing}}
 
-\hypertarget{model}{%
-\subsection{Model}\label{model}}
-
-\hypertarget{implementation}{%
-\subsection{Implementation}\label{implementation}}
+Because this is time series data, we needed to make sure the training
+and testing data were both contiguous. We trained the models on the
+first 90\% of the rows and tested on the final 10\%.
 
 \hypertarget{ridge-regression}{%
 \section{Ridge Regression}\label{ridge-regression}}
 
-\hypertarget{theory-1}{%
-\subsection{Theory}\label{theory-1}}
+\hypertarget{theory}{%
+\subsection{Theory}\label{theory}}
 
 Ridge regression is a method for penalized regression. Consider the
 model \[Y_i^0 = \alpha + \beta x_i^0 + \epsilon_i, \quad  i = 1,..., n\]
@@ -307,18 +306,54 @@ of that penalty determined by the choice of \(\lambda\). The
 coefficients will be shrunk towards zero, but will not be set to zero
 (as opposed to in lasso regression).
 
-\hypertarget{model-1}{%
-\subsection{Model}\label{model-1}}
+\hypertarget{model}{%
+\subsection{Model}\label{model}}
 
-\hypertarget{implementation-1}{%
-\subsection{Implementation}\label{implementation-1}}
+We performed ridge regression using the model detailed above, with the
+following input variables:
+
+\begin{itemize}
+\tightlist
+\item
+  Temperature and squared temperature
+\item
+  Time of year
+\item
+  Hour
+\item
+  Month
+\item
+  One-hot encoded variables for each day of the week
+\item
+  Daily Fourier terms
+  \(\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)\)
+  for \(k \in \{1,...,K\}\)
+\item
+  Annual Fourier terms likewise
+\end{itemize}
+
+We had two hyperparameters to tune: the standard ridge regression
+parameter \(\lambda\) and the maximum order of the Fourier terms
+included \(K\). For sake of simplicity, we elected to use the same \(K\)
+value for both the daily and the annual terms.
+
+\hypertarget{implementation}{%
+\subsection{Implementation}\label{implementation}}
+
+We implemented ridge regression using \texttt{RcppArmadillo}. To select
+\(\lambda\), we used \(k\)-fold cross-validation, also implemented in
+\texttt{RcppArmadillo} using \texttt{RcppParallel} to parallelise the
+cross-validation process. These functions can be found in our package in
+the
+\href{https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast/src/ridge_regression.h}{\texttt{ridge\_regression.h}
+file}.
 
 \hypertarget{gaussian-process-regression}{%
 \section{Gaussian Process
 Regression}\label{gaussian-process-regression}}
 
-\hypertarget{theory-2}{%
-\subsection{Theory}\label{theory-2}}
+\hypertarget{theory-1}{%
+\subsection{Theory}\label{theory-1}}
 
 A gaussian process \(W = (W(x))_{x \in \mathcal{X}}\) is a collection of
 random variables, which have a joint Gaussian distribution. One useful
@@ -351,86 +386,39 @@ K = (k(x_i^0,x_j^0))_{ij}
 
 \[
 k^n(x) = (k(x_1^0,x),k(x_n^0,x)).
-\] Although if it looks scary just remember a computer can do it! In
-pratice, to find the posterior distribution, we maximise the marginal
-log-likelihood.
+\] Although if it looks scary just remember a computer can do it! This
+gives us a way to then model
 
-\hypertarget{model-2}{%
-\subsection{Model}\label{model-2}}
+\[Y^0 \sim \text{N}(0,K _ \lambda I_n),\]
 
-\hypertarget{implementation-2}{%
-\subsection{Implementation}\label{implementation-2}}
+to simulate our results.
 
-For the gaussian process regression, we will use the
-\texttt{kernlab::gausspr} function, which can perform multivariate
-gaussian process regression, allowing us to add our additional features
-as covariates. By convention we will use the rbf kernel:
+In practice, to find the posterior distribution, we maximise the
+marginal log-likelihood.
+
+\hypertarget{tuning-hyperparameters}{%
+\subsection{Tuning hyperparameters}\label{tuning-hyperparameters}}
+
+For our needs we will use a radial basis function kernel, which has a
+single hyperparemter \(l\), often called the bandwidth.
 
 \[
 k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
 \]
 
-where \(l\) is another hyperparameter to be tuned. Below is our code
-which fits the gaussian process regression model to given data:
+We also have the hyperparameter \(\sigma\) which is the standard
+deviation of our noise. In order to find the ideal hyperparameters we
+will attempt to maximize the marginal log likelihood. The marginal log
+likelihood is given by:
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{gaussian\_process\_reg \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data,}
-                                 \DataTypeTok{class =} \StringTok{"DE"}\NormalTok{,}
-                                 \DataTypeTok{kernel =} \StringTok{"rbfdot"}\NormalTok{,}
-                                 \DataTypeTok{plot =} \OtherTok{FALSE}\NormalTok{,}
-                                 \DataTypeTok{sigma =} \DecValTok{100}\NormalTok{) \{}
+\[
+\log p(y^0 \mid x^0, l,\sigma^2) = -\frac{1}{2} y^0 (K + \sigma^2 I_n)^{-1} y^0 - \frac{1}{2} \log \lvert K + \sigma^2 I_n \rvert 
+\]
 
-  \CommentTok{\#Training and test set, first 90\% of data is training, last 10\% is test}
-\NormalTok{  train\_index \textless{}{-}}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(data) }\OperatorTok{*}\StringTok{ }\FloatTok{0.9}\NormalTok{)}
-\NormalTok{  train\_set \textless{}{-}}\StringTok{ }\NormalTok{data[}\DecValTok{1}\OperatorTok{:}\NormalTok{train\_index, ]}
-\NormalTok{  test\_set \textless{}{-}}\StringTok{ }\NormalTok{data[(train\_index }\OperatorTok{+}\StringTok{ }\DecValTok{1}\NormalTok{)}\OperatorTok{:}\KeywordTok{nrow}\NormalTok{(data), ]}
-
-  \CommentTok{\# Define the Gaussian process model}
-\NormalTok{  gpr\_model \textless{}{-}}\StringTok{ }\NormalTok{kernlab}\OperatorTok{::}\KeywordTok{gausspr}\NormalTok{(}\KeywordTok{as.matrix}\NormalTok{(train\_set[, }\KeywordTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
-                                \KeywordTok{as.vector}\NormalTok{(train\_set[[class]]),}
-                                \DataTypeTok{kernel =}\NormalTok{ kernel, }\DataTypeTok{kpar =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{sigma =}\NormalTok{ sigma))}
-
-  \CommentTok{\# Predict the mean function for plotting}
-\NormalTok{  mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(data}\OperatorTok{$}\NormalTok{toy))}
-\NormalTok{  prediction \textless{}{-}}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}
-                           \DataTypeTok{toy =}\NormalTok{ data}\OperatorTok{$}\NormalTok{toy,}
-                           \DataTypeTok{mean =}\NormalTok{ mean\_func)}
-
-\NormalTok{  data\_with\_pred \textless{}{-}}\StringTok{ }\KeywordTok{left\_join}\NormalTok{(data, prediction, }\DataTypeTok{by =} \StringTok{"toy"}\NormalTok{)}
-
-  \CommentTok{\# Evaluate performance}
-\NormalTok{  test\_mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(test\_set}\OperatorTok{$}\NormalTok{toy))}
-\NormalTok{  performance \textless{}{-}}\StringTok{ }\KeywordTok{postResample}\NormalTok{(}\DataTypeTok{pred =}\NormalTok{ test\_mean\_func, }\DataTypeTok{obs =}\NormalTok{ test\_set}\OperatorTok{$}\NormalTok{DE)}
-
-  \CommentTok{\# Include Plots ?}
-  \ControlFlowTok{if}\NormalTok{ (plot)\{}
-\NormalTok{    pl \textless{}{-}}\StringTok{ }\KeywordTok{ggplot}\NormalTok{(data\_with\_pred, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ toy)) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{geom\_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =} \KeywordTok{get}\NormalTok{(class)), }\DataTypeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{geom\_line}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =}\NormalTok{ mean), }\DataTypeTok{color =}\NormalTok{ class\_colours[class]) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{title =} \StringTok{"GPR model predictions"}\NormalTok{,}
-           \DataTypeTok{x =} \StringTok{"Date"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Demand"}\NormalTok{)}
-\NormalTok{    pl}
-\NormalTok{  \} }\ControlFlowTok{else}\NormalTok{ \{}
-\NormalTok{    pl \textless{}{-}}\StringTok{ }\OtherTok{NULL}
-\NormalTok{  \}}
-  \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{model =}\NormalTok{ gpr\_model,}
-\NormalTok{              data \textless{}{-}}\StringTok{ }\NormalTok{data\_with\_pred,}
-\NormalTok{              performance,}
-              \DataTypeTok{plot =}\NormalTok{ pl))}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
-
-Since we are working as bayesians to find the ideal hyperparameters
-\(l\) and \(\sigma\), we will minimise the negative log likelihood of
-the model. On one hand this skirts the issues of cross validation, but
-on the other hand we are left with a non convex optimisation problem. To
-get around this issue we outsoucre to C++, making use of the C++
-optimising library optim. Then parallizing with RcppArmadillo to
-parallelise the optimisation over a two dimensional grid of intiial
-choices. Below is the \texttt{RcppArmadillo} code we used to optimise
-the hyperparameters:
+where we remove a constant which is irrelevant to the optimisation.
+Since this is computationaly intense, we outsource the optimisation to
+C++, and integrate it via RcppArmadillo. Below is the C++ code we used,
+which can also be found \texttt{gauss\_process\_reg.cpp}:
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -480,6 +468,88 @@ the hyperparameters:
 
     \CommentTok{// Return the optimised parameters}
     \ControlFlowTok{return}\NormalTok{ theta;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+We parallize over the grid of initial choices to speed up the
+optimisation. As we going to be performing this on different sized
+datasets (half hourly, hourly and daily) it is unwise to perform
+parallisation over those. Instead we created an wrapper function in
+\texttt{R} which can take in an arbitrary dataset. We display it below
+but it can be found in \texttt{gauss\_process\_reg.R}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{find\_optimal\_params \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(X, y) \{}
+  \CommentTok{\# Source the C++ file}
+  \KeywordTok{sourceCpp}\NormalTok{(}\StringTok{"gauss\_process\_reg.cpp"}\NormalTok{)}
+  
+  \CommentTok{\# Call the C++ function}
+\NormalTok{  theta \textless{}{-}}\StringTok{ }\KeywordTok{optimise\_gaussian\_process}\NormalTok{(X, y)}
+  
+  \CommentTok{\# Return the optimal parameters}
+  \KeywordTok{return}\NormalTok{(theta)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{implementation-1}{%
+\subsection{Implementation}\label{implementation-1}}
+
+For the gaussian process regression, we will use the
+\texttt{kernlab::gausspr} function, which can perform multivariate
+gaussian process regression, allowing us to add our additional features
+as covariates. Since we have our ideal hyperparameters \(l\) and
+\(\sigma\) for each dataset, we can now fit the gaussian process
+regression model fairly easily. Source code for the following can be
+found in \texttt{gauss\_process\_reg.R}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{gaussian\_process\_reg \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data,}
+                                 \DataTypeTok{class =} \StringTok{"DE"}\NormalTok{,}
+                                 \DataTypeTok{kernel =} \StringTok{"rbfdot"}\NormalTok{,}
+                                 \DataTypeTok{plot =} \OtherTok{FALSE}\NormalTok{,}
+                                 \DataTypeTok{sigma =} \DecValTok{100}\NormalTok{) \{}
+
+  \CommentTok{\#Training and test set, first 90\% of data is training, last 10\% is test}
+\NormalTok{  train\_index \textless{}{-}}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(data) }\OperatorTok{*}\StringTok{ }\FloatTok{0.9}\NormalTok{)}
+\NormalTok{  train\_set \textless{}{-}}\StringTok{ }\NormalTok{data[}\DecValTok{1}\OperatorTok{:}\NormalTok{train\_index, ]}
+\NormalTok{  test\_set \textless{}{-}}\StringTok{ }\NormalTok{data[(train\_index }\OperatorTok{+}\StringTok{ }\DecValTok{1}\NormalTok{)}\OperatorTok{:}\KeywordTok{nrow}\NormalTok{(data), ]}
+
+  \CommentTok{\# Define the Gaussian process model}
+\NormalTok{  gpr\_model \textless{}{-}}\StringTok{ }\NormalTok{kernlab}\OperatorTok{::}\KeywordTok{gausspr}\NormalTok{(}\KeywordTok{as.matrix}\NormalTok{(train\_set[, }\KeywordTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
+                                \KeywordTok{as.vector}\NormalTok{(train\_set[[class]]),}
+                                \DataTypeTok{kernel =}\NormalTok{ kernel, }\DataTypeTok{kpar =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{sigma =}\NormalTok{ sigma))}
+
+  \CommentTok{\# Predict the mean function for plotting}
+\NormalTok{  mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(data}\OperatorTok{$}\NormalTok{toy))}
+\NormalTok{  prediction \textless{}{-}}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}
+                           \DataTypeTok{toy =}\NormalTok{ data}\OperatorTok{$}\NormalTok{toy,}
+                           \DataTypeTok{mean =}\NormalTok{ mean\_func)}
+
+\NormalTok{  data\_with\_pred \textless{}{-}}\StringTok{ }\KeywordTok{left\_join}\NormalTok{(data, prediction, }\DataTypeTok{by =} \StringTok{"toy"}\NormalTok{)}
+
+  \CommentTok{\# Evaluate performance}
+\NormalTok{  test\_mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(test\_set}\OperatorTok{$}\NormalTok{toy))}
+\NormalTok{  performance \textless{}{-}}\StringTok{ }\KeywordTok{postResample}\NormalTok{(}\DataTypeTok{pred =}\NormalTok{ test\_mean\_func, }\DataTypeTok{obs =}\NormalTok{ test\_set}\OperatorTok{$}\NormalTok{DE)}
+
+  \CommentTok{\# Include Plots ?}
+  \ControlFlowTok{if}\NormalTok{ (plot)\{}
+\NormalTok{    pl \textless{}{-}}\StringTok{ }\KeywordTok{ggplot}\NormalTok{(data\_with\_pred, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ toy)) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{geom\_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =} \KeywordTok{get}\NormalTok{(class)), }\DataTypeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{geom\_line}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =}\NormalTok{ mean), }\DataTypeTok{color =}\NormalTok{ class\_colours[class]) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{title =} \StringTok{"GPR model predictions"}\NormalTok{,}
+           \DataTypeTok{x =} \StringTok{"Date"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Demand"}\NormalTok{)}
+\NormalTok{    pl}
+\NormalTok{  \} }\ControlFlowTok{else}\NormalTok{ \{}
+\NormalTok{    pl \textless{}{-}}\StringTok{ }\OtherTok{NULL}
+\NormalTok{  \}}
+  \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{model =}\NormalTok{ gpr\_model,}
+\NormalTok{              data \textless{}{-}}\StringTok{ }\NormalTok{data\_with\_pred,}
+\NormalTok{              performance,}
+              \DataTypeTok{plot =}\NormalTok{ pl))}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}

@@ -75,15 +75,6 @@ find_optimal_params <- function(X, y) {
 }
 
 
-X <- df_day$toy
-y <- df_day$DE
-
-# Find the optimal parameters
-theta <- find_optimal_params(X, y)
-
-# Print the optimal parameters
-print(theta)
-
 
 
 #Perform Gaussian Process Regression on daily data for each class
