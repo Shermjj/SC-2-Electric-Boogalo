@@ -315,6 +315,129 @@ log-likelihood.
 \hypertarget{implementation-2}{%
 \subsection{Implementation}\label{implementation-2}}
 
+For the gaussian process regression, we will use the
+\texttt{kernlab::gausspr} function, which can perform multivariate
+gaussian process regression, allowing us to add our additional features
+as covariates. By convention we will use the rbf kernel:
+
+\[
+k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
+\]
+
+where \(l\) is another hyperparameter to be tuned. Below is our code
+which fits the gaussian process regression model to given data:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{gaussian\_process\_reg \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data,}
+                                 \DataTypeTok{class =} \StringTok{"DE"}\NormalTok{,}
+                                 \DataTypeTok{kernel =} \StringTok{"rbfdot"}\NormalTok{,}
+                                 \DataTypeTok{plot =} \OtherTok{FALSE}\NormalTok{,}
+                                 \DataTypeTok{sigma =} \DecValTok{100}\NormalTok{) \{}
+
+  \CommentTok{\#Training and test set, first 90\% of data is training, last 10\% is test}
+\NormalTok{  train\_index \textless{}{-}}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(data) }\OperatorTok{*}\StringTok{ }\FloatTok{0.9}\NormalTok{)}
+\NormalTok{  train\_set \textless{}{-}}\StringTok{ }\NormalTok{data[}\DecValTok{1}\OperatorTok{:}\NormalTok{train\_index, ]}
+\NormalTok{  test\_set \textless{}{-}}\StringTok{ }\NormalTok{data[(train\_index }\OperatorTok{+}\StringTok{ }\DecValTok{1}\NormalTok{)}\OperatorTok{:}\KeywordTok{nrow}\NormalTok{(data), ]}
+
+  \CommentTok{\# Define the Gaussian process model}
+\NormalTok{  gpr\_model \textless{}{-}}\StringTok{ }\NormalTok{kernlab}\OperatorTok{::}\KeywordTok{gausspr}\NormalTok{(}\KeywordTok{as.matrix}\NormalTok{(train\_set[, }\KeywordTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
+                                \KeywordTok{as.vector}\NormalTok{(train\_set[[class]]),}
+                                \DataTypeTok{kernel =}\NormalTok{ kernel, }\DataTypeTok{kpar =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{sigma =}\NormalTok{ sigma))}
+
+  \CommentTok{\# Predict the mean function for plotting}
+\NormalTok{  mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(data}\OperatorTok{$}\NormalTok{toy))}
+\NormalTok{  prediction \textless{}{-}}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}
+                           \DataTypeTok{toy =}\NormalTok{ data}\OperatorTok{$}\NormalTok{toy,}
+                           \DataTypeTok{mean =}\NormalTok{ mean\_func)}
+
+\NormalTok{  data\_with\_pred \textless{}{-}}\StringTok{ }\KeywordTok{left\_join}\NormalTok{(data, prediction, }\DataTypeTok{by =} \StringTok{"toy"}\NormalTok{)}
+
+  \CommentTok{\# Evaluate performance}
+\NormalTok{  test\_mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(test\_set}\OperatorTok{$}\NormalTok{toy))}
+\NormalTok{  performance \textless{}{-}}\StringTok{ }\KeywordTok{postResample}\NormalTok{(}\DataTypeTok{pred =}\NormalTok{ test\_mean\_func, }\DataTypeTok{obs =}\NormalTok{ test\_set}\OperatorTok{$}\NormalTok{DE)}
+
+  \CommentTok{\# Include Plots ?}
+  \ControlFlowTok{if}\NormalTok{ (plot)\{}
+\NormalTok{    pl \textless{}{-}}\StringTok{ }\KeywordTok{ggplot}\NormalTok{(data\_with\_pred, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ toy)) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{geom\_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =} \KeywordTok{get}\NormalTok{(class)), }\DataTypeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{geom\_line}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =}\NormalTok{ mean), }\DataTypeTok{color =}\NormalTok{ class\_colours[class]) }\OperatorTok{+}
+\StringTok{      }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{title =} \StringTok{"GPR model predictions"}\NormalTok{,}
+           \DataTypeTok{x =} \StringTok{"Date"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Demand"}\NormalTok{)}
+\NormalTok{    pl}
+\NormalTok{  \} }\ControlFlowTok{else}\NormalTok{ \{}
+\NormalTok{    pl \textless{}{-}}\StringTok{ }\OtherTok{NULL}
+\NormalTok{  \}}
+  \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{model =}\NormalTok{ gpr\_model,}
+\NormalTok{              data \textless{}{-}}\StringTok{ }\NormalTok{data\_with\_pred,}
+\NormalTok{              performance,}
+              \DataTypeTok{plot =}\NormalTok{ pl))}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Since we are working as bayesians to find the ideal hyperparameters
+\(l\) and \(\sigma\), we will minimise the negative log likelihood of
+the model. On one hand this skirts the issues of cross validation, but
+on the other hand we are left with a non convex optimisation problem. To
+get around this issue we outsoucre to C++, making use of the C++
+optimising library optim. Then parallizing with RcppArmadillo to
+parallelise the optimisation over a two dimensional grid of intiial
+choices. Below is the \texttt{RcppArmadillo} code we used to optimise
+the hyperparameters:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\PreprocessorTok{\#include }\ImportTok{\textless{}RcppArmadillo.h\textgreater{}}
+\PreprocessorTok{\#include }\ImportTok{\textless{}optim.hpp\textgreater{}}
+
+\CommentTok{// [[Rcpp::depends(RcppArmadillo)]]}
+
+\CommentTok{// Define the RBF kernel}
+\NormalTok{arma::mat rbf\_kernel(}\AttributeTok{const}\NormalTok{ arma::mat\& X, }\DataTypeTok{double}\NormalTok{ l, }\DataTypeTok{double}\NormalTok{ sigma) \{}
+\NormalTok{    arma::mat K = arma::zeros(X.n\_rows, X.n\_rows);}
+    \ControlFlowTok{for}\NormalTok{ (}\DataTypeTok{unsigned}\NormalTok{ i = }\DecValTok{0}\NormalTok{; i \textless{} X.n\_rows; ++i) \{}
+        \ControlFlowTok{for}\NormalTok{ (}\DataTypeTok{unsigned}\NormalTok{ j = }\DecValTok{0}\NormalTok{; j \textless{} X.n\_rows; ++j) \{}
+            \DataTypeTok{double}\NormalTok{ dist = arma::norm(X.row(i) {-} X.row(j), }\DecValTok{2}\NormalTok{);}
+\NormalTok{            K(i, j) = }\BuiltInTok{std::}\NormalTok{pow(sigma, }\DecValTok{2}\NormalTok{) * }\BuiltInTok{std::}\NormalTok{exp({-}}\BuiltInTok{std::}\NormalTok{pow(dist, }\DecValTok{2}\NormalTok{) / (}\DecValTok{2}\NormalTok{ * }\BuiltInTok{std::}\NormalTok{pow(l, }\DecValTok{2}\NormalTok{)));}
+\NormalTok{        \}}
+\NormalTok{    \}}
+    \ControlFlowTok{return}\NormalTok{ K;}
+\NormalTok{\}}
+
+\CommentTok{// Define the negative log marginal likelihood}
+\DataTypeTok{double}\NormalTok{ neg\_log\_marginal\_likelihood(}\AttributeTok{const}\NormalTok{ arma::vec\& theta, arma::vec* grad\_out, }\DataTypeTok{void}\NormalTok{* opt\_data) \{}
+    \CommentTok{// Extract data and parameters}
+\NormalTok{    arma::mat X = *}\KeywordTok{static\_cast}\NormalTok{\textless{}arma::mat*\textgreater{}(opt\_data);}
+\NormalTok{    arma::vec y = *}\KeywordTok{static\_cast}\NormalTok{\textless{}arma::vec*\textgreater{}(opt\_data);}
+    \DataTypeTok{double}\NormalTok{ l = theta(}\DecValTok{0}\NormalTok{);}
+    \DataTypeTok{double}\NormalTok{ sigma = theta(}\DecValTok{1}\NormalTok{);}
+
+    \CommentTok{// Calculate the kernel matrix}
+\NormalTok{    arma::mat K = rbf\_kernel(X, l, sigma);}
+
+    \CommentTok{// Calculate the log marginal likelihood}
+    
+    \DataTypeTok{double}\NormalTok{ log\_likelihood = {-}}\FloatTok{0.5}\NormalTok{ * arma::as\_scalar(y.t() * arma::solve(K, y)) {-} }\FloatTok{0.5}\NormalTok{ * arma::log\_det(K + l ) {-} }\FloatTok{0.5}\NormalTok{ * X.n\_rows * }\BuiltInTok{std::}\NormalTok{log(}\DecValTok{2}\NormalTok{ * M\_PI);}
+
+    \CommentTok{// Return the negative log marginal likelihood}
+    \ControlFlowTok{return}\NormalTok{ {-}log\_likelihood;}
+\NormalTok{\}}
+
+\CommentTok{// [[Rcpp::export]]}
+\NormalTok{arma::vec optimise\_gaussian\_process(arma::mat X, arma::vec y) \{}
+    \CommentTok{// Initial guess for the parameters}
+\NormalTok{    arma::vec theta = arma::ones(}\DecValTok{2}\NormalTok{);}
+
+    \CommentTok{// Optimise the negative log marginal likelihood}
+    \DataTypeTok{bool}\NormalTok{ success = optim::de(theta, neg\_log\_marginal\_likelihood, \&X);}
+
+    \CommentTok{// Return the optimised parameters}
+    \ControlFlowTok{return}\NormalTok{ theta;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
 \hypertarget{results}{%
 \section{Results}\label{results}}
 
