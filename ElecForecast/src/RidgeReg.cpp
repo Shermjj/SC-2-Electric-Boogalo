@@ -51,20 +51,25 @@ List RidgeReg(const arma::mat& X, const arma::vec& y, double lambda) {
 
 // [[Rcpp::export]]
 List RidgeRegPar(const arma::mat& X, const arma::vec& y, double lambda) {
-  int n = X.n_rows, k = X.n_cols;
+  int n = X.n_rows;
+  int k = X.n_cols + 1;
+  
+  // Add a column of ones to X for the intercept
+  arma::mat X_with_intercept = arma::join_horiz(arma::ones<arma::vec>(n), X);
   
   // Prepare to calculate XtX in parallel
   arma::mat XtX = arma::zeros<arma::mat>(k, k);
-  MatrixMultiplier multiplier(X, XtX);
+  MatrixMultiplier multiplier(X_with_intercept, XtX);
   parallelFor(0, k, multiplier);
   
   // Add the ridge penalty
   arma::mat ridgePenalty = lambda * arma::eye<arma::mat>(k, k);
+  ridgePenalty(0, 0) = 0; // Do not penalize the intercept term
   arma::mat XtX_ridge = XtX + ridgePenalty;
   
   // Solve for coefficients
-  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X) * y);
-  arma::colvec resid = y - X * coef;
+  arma::colvec coef = arma::solve(XtX_ridge, arma::trans(X_with_intercept) * y);
+  arma::colvec resid = y - X_with_intercept * coef;
   double sig2 = arma::as_scalar(arma::trans(resid) * resid / n);
   
   return List::create(Named("error") = sig2, Named("coefficients") = coef);
