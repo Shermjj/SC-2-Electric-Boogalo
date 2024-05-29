@@ -95,7 +95,7 @@ List parallel_ridge_cross_validation(NumericMatrix x_vars,
         }
         
         // Train model and predict
-        List model = RidgeReg(convertAndProcess(x_train), y_train, lambda);
+        List model = RidgeRegPar(convertAndProcess(x_train), y_train, lambda);
         arma::colvec coeffs = Rcpp::as<arma::colvec>(model["coefficients"]);
         arma::mat x_test_arma = Rcpp::as<arma::mat>(x_test);
         arma::vec predictions = makePredictions(x_test_arma, coeffs);
@@ -130,7 +130,7 @@ List parallel_ridge_cross_validation(NumericMatrix x_vars,
     x_final(_, 4 * best_K + j) = x_vars(_, j);
   }
   
-  List final_model = RidgeReg(convertAndProcess(x_final), y_var, best_lambda);
+  List final_model = RidgeRegPar(convertAndProcess(x_final), y_var, best_lambda);
   
   return List::create(Named("best_K") = best_K,
                       Named("best_lambda") = best_lambda,

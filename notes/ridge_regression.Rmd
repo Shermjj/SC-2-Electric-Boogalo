@@ -213,13 +213,13 @@ halfhr_ridge_test_par <- RidgeRegPar(
   lambda = de_halfhr_ridge$lambda.1se * 15076 # Scale lambda by number of rows in training data
 )
 
-# No intercept so this doesn't work
-# halfhr_ridge_predict_par <- halfhr_X_test %*% halfhr_ridge_test_par$coefficients
+halfhr_ridge_predict_par <- halfhr_X_test %*% halfhr_ridge_test_par$coefficients
 
 # Plot the predictions on the test set
 ggplot(halfhr_features_test, aes(x = dateTime, y = DE)) +
   geom_line() +
-  geom_line(aes(y = halfhr_ridge_predict), color = "red")
+  geom_line(aes(y = halfhr_ridge_predict), color = "red") +
+  geom_line(aes(y = halfhr_ridge_predict_par), color = "blue")
 ```
 
 Same prediction yay!
@@ -252,16 +252,6 @@ ggplot(halfhr_features_test, aes(x = dateTime, y = DE)) +
   geom_line() +
   geom_line(aes(y = halfhr_cv_preds), color = "red")
 ```
-
-Okay something has gone horribly awry. Which coefficients are most off?
-
-```{r}
-my_cv_coef <- cv_results$final_model$coefficients
-okay_coef <- halfhr_ridge_test$coefficients
-
-diff <- my_cv_coef[1:length(okay_coef)] - okay_coef
-```
-
 
 
 # Ridge regression on total demand

@@ -6,4 +6,6 @@ using namespace Rcpp;
 
 List RidgeReg(const arma::mat& X, const arma::vec& y, double lambda);
 
+List RidgeRegPar(const arma::mat& X, const arma::vec& y, double lambda);
+
 #endif
