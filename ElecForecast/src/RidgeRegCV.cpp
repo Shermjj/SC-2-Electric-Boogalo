@@ -28,7 +28,7 @@ arma::vec makePredictions(const arma::mat& x_test, const arma::colvec& coefficie
 }
 
 // [[Rcpp::export]]
-NumericMatrix parallel_ridge_cross_validation(NumericMatrix x_vars,
+List parallel_ridge_cross_validation(NumericMatrix x_vars,
                                               NumericVector y_var,
                                               NumericVector time_counter,
                                               double daily_period,
@@ -45,7 +45,13 @@ NumericMatrix parallel_ridge_cross_validation(NumericMatrix x_vars,
   NumericMatrix daily_terms = GenFT(time_counter, max_K, daily_period);
   NumericMatrix annual_terms = GenFT(time_counter, max_K, annual_period);
   
-  // Perform cross-validation for each K
+  // Store the lowest MSE as a very large number
+  double min_mse = std::numeric_limits<double>::max();
+  // Store best lambda and K values
+  int best_K = 0;
+  double best_lambda = 0.0;
+  
+  // Loop over K values
   for (int K = 1; K <= max_K; ++K) {
     
     // Combine daily terms, annual terms, and additional variables into a single matrix
@@ -89,7 +95,7 @@ NumericMatrix parallel_ridge_cross_validation(NumericMatrix x_vars,
         }
         
         // Train model and predict
-        List model = RidgeReg(convertAndProcess(x_train), y_train, lambda);
+        List model = RidgeRegPar(convertAndProcess(x_train), y_train, lambda);
         arma::colvec coeffs = Rcpp::as<arma::colvec>(model["coefficients"]);
         arma::mat x_test_arma = Rcpp::as<arma::mat>(x_test);
         arma::vec predictions = makePredictions(x_test_arma, coeffs);
@@ -104,9 +110,63 @@ NumericMatrix parallel_ridge_cross_validation(NumericMatrix x_vars,
         }
       
       // Average MSE over all folds for this lambda and K
-      mse_results(K - 1, lambda_index) = total_mse / n_folds;
+      double avg_mse = total_mse / n_folds;
+      mse_results(K - 1, lambda_index) = avg_mse;
+      if (avg_mse < min_mse) {
+        min_mse = avg_mse;
+        best_K = K;
+        best_lambda = lambda;
+      }
     }
   }
   
-  return mse_results;
+  // Train the final model using the best K and lambda values
+  NumericMatrix x_final(n, 4 * best_K + n_vars);
+  for (int j = 0; j < 2 * best_K; ++j) {
+    x_final(_, j) = daily_terms(_, j);
+    x_final(_, j + 2 * best_K) = annual_terms(_, j);
+  }
+  for (int j = 0; j < n_vars; ++j) {
+    x_final(_, 4 * best_K + j) = x_vars(_, j);
+  }
+  
+  List final_model = RidgeRegPar(convertAndProcess(x_final), y_var, best_lambda);
+  
+  return List::create(Named("best_K") = best_K,
+                      Named("best_lambda") = best_lambda,
+                      Named("mse_results") = mse_results,
+                      Named("final_model") = final_model);
 }
+
+// [[Rcpp::export]]
+NumericVector predict_parallel_ridge_cv(List model,
+                                        NumericMatrix x_test,
+                                        NumericVector time_counter,
+                                        double daily_period,
+                                        double annual_period) {
+  int best_K = model["best_K"];
+  double best_lambda = model["best_lambda"];
+  List final_model = model["final_model"];
+  
+  // Generate Fourier terms for the test data
+  int n_test = time_counter.size();
+  NumericMatrix daily_terms = GenFT(time_counter, best_K, daily_period);
+  NumericMatrix annual_terms = GenFT(time_counter, best_K, annual_period);
+  
+  // Combine daily terms, annual terms, and additional variables into a single matrix
+  NumericMatrix x_final(n_test, 4 * best_K + x_test.ncol());
+  for (int j = 0; j < 2 * best_K; ++j) {
+    x_final(_, j) = daily_terms(_, j);
+    x_final(_, j + 2 * best_K) = annual_terms(_, j);
+  }
+  for (int j = 0; j < x_test.ncol(); ++j) {
+    x_final(_, 4 * best_K + j) = x_test(_, j);
+  }
+  
+  // Make predictions
+  arma::colvec coeffs = Rcpp::as<arma::colvec>(final_model["coefficients"]);
+  arma::vec predictions = makePredictions(convertAndProcess(x_final), coeffs);
+  
+  return wrap(predictions);
+}
+

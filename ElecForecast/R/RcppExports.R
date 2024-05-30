@@ -24,3 +24,7 @@ parallel_ridge_cross_validation <- function(x_vars, y_var, time_counter, daily_p
     .Call(`_ElecForecast_parallel_ridge_cross_validation`, x_vars, y_var, time_counter, daily_period, annual_period, max_K, lambda_values, n_folds)
 }
 
+predict_parallel_ridge_cv <- function(model, x_test, time_counter, daily_period, annual_period) {
+    .Call(`_ElecForecast_predict_parallel_ridge_cv`, model, x_test, time_counter, daily_period, annual_period)
+}
+
