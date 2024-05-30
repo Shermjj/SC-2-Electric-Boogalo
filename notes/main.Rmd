@@ -646,7 +646,7 @@ gaussian_process_reg <- function(data,
   test_set <- data[(train_index + 1):nrow(data), ]
 
   # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(as.matrix(train_set[,-[[class]]]),
+  gpr_model <- kernlab::gausspr(as.matrix(train_set[,c("toy", "temp")]),
                                 as.vector(train_set[[class]]),
                                 kernel = kernel, kpar = list(sigma = sigma))
 
@@ -696,7 +696,7 @@ We then ran the Gaussian Process Regression model on the three datasets. We can 
 
 Considering the daily data aggregation removed a lot of the complexity of the model, the GPR had no trouble with a fit:
 
-```{r}
+```{r fig.height=10}
 library(jpeg)
 library(grid)
 library(cowplot)
@@ -727,7 +727,7 @@ Unfortunately, as a side affect of the gaussian kernel, we has considerable trai
 
 For hourly data, we can clearly see the daily cycles appearing, fortunately our GPR is able to get a pretty accurate fit, including the daily peaks of electricity consumption. The same `sigma` was applied to the yearly set (and can be found in the `data` file in the github rep) and it performed much worse, but that's to be expected.
 
-```{r}
+```{r fig.height=10}
 
 image_files2 <- c(here::here("data/plots_gpr/hourWEEK_AB.jpeg"),
                   here::here("data/plots_gpr/hourWEEK_C1.jpeg"),
@@ -746,7 +746,7 @@ print(combined_plot2)
 
 Similarly to the hourly data, the half-hourly data has daily cycles, but with an additional peak early on in the day - perhaps the coronation street kettle myth in action?
 
-```{r}
+```{r fig.height=10}
 
 image_files3 <- c(here::here("data/plots_gpr/half_hourWEEK_AB.jpeg"),
                   here::here("data/plots_gpr/half_hourWEEK_C1.jpeg"),
@@ -768,7 +768,6 @@ Despite good fits on the cyclic data, the gaussian process regression has terrib
 # BEEG COMPARISON
 
 
-## Ridge regression
 
 
 
