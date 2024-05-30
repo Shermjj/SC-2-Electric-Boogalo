@@ -193,13 +193,13 @@ We first split the dataset into training and testing sets:
 # Split the data into training and test sets
 # 90% training set
 n_train_halfhr <- round(0.9*nrow(df_halfhr_scaled))
-# Training and testing counter 
+# Training and testing counter
 train_counter_halfhr <- df_halfhr_scaled$counter[1:n_train_halfhr]
 test_counter_halfhr <- df_halfhr_scaled$counter[-(1:n_train_halfhr)]
 # Training and testing features
-halfhr_features_train <- df_halfhr_scaled[1:n_train_halfhr,] %>% 
+halfhr_features_train <- df_halfhr_scaled[1:n_train_halfhr,] %>%
   select(-counter)
-halfhr_features_test <- df_halfhr_scaled[-(1:n_train_halfhr),] %>% 
+halfhr_features_test <- df_halfhr_scaled[-(1:n_train_halfhr),] %>%
   select(-counter)
 ```
 
@@ -207,20 +207,20 @@ Next, we perform 5-fold cross-validation to identify the $\lambda$ and $K$ value
 
 ```{r}
 # Range of lambda values
-lambda_values <- seq(0.01, 1, length.out = 10) * nrow(halfhr_features_train)
+lambda_values_halfhr <- seq(0.01, 1, length.out = 10) * nrow(halfhr_features_train)
 
 # lapply over social classes
 halfhr_ridge_results <- lapply(soc_classes, function(class) {
   y_class <- halfhr_features_train[[as.character(class)]]
   # Perform cross-validation
   cv_results <- parallel_ridge_cross_validation(
-    x_vars = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]), 
+    x_vars = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]),
     y_var = y_class,
-    time_counter = train_counter_halfhr, 
+    time_counter = train_counter_halfhr,
     daily_period = 48,
     annual_period = 48 * 365,
     max_K = 5,
-    lambda_values = lambda_values,
+    lambda_values = lambda_values_halfhr,
     n_folds = 10
   )
   return(cv_results)
@@ -228,9 +228,12 @@ halfhr_ridge_results <- lapply(soc_classes, function(class) {
 names(halfhr_ridge_results) <- soc_classes
 
 # Get predictions for each model on the test set
-halfhr_ridge_preds <- lapply(halfhr_ridge_results, function(cv_results) {
+halfhr_x_test <- as.matrix(halfhr_features_test[,7:ncol(halfhr_features_test)])
+halfhr_ridge_preds <- lapply(soc_classes, function(class) {
+  cv_results <- halfhr_ridge_results[[as.character(class)]]
   preds <- predict_parallel_ridge_cv(model = cv_results,
-                                     x_test = as.matrix(halfhr_features_test[,7:ncol(halfhr_features_test)]),
+                                     x_test = halfhr_x_test,
+                                     y_test = halfhr_features_test[[as.character(class)]],
                                      time_counter = test_counter_halfhr,
                                      daily_period = 48,
                                      annual_period = 48 * 365)
@@ -241,28 +244,39 @@ names(halfhr_ridge_preds) <- paste0(soc_classes, "_preds")
 
 We can now visualize the predictions on the testing set:
 
-```{r}
-library(gridExtra)
+```{r fig.height=8}
 # Dataframe of true values and predictions on test set
-halfhr_test_true_preds <- halfhr_features_test %>% 
-  select(dateTime, all_of(soc_classes)) %>% 
+halfhr_test_true_preds <- halfhr_features_test %>%
+  select(dateTime, all_of(soc_classes)) %>%
   # Add predictions
-  bind_cols(as.data.frame(halfhr_ridge_preds))
+  bind_cols(as.data.frame(lapply(halfhr_ridge_preds, function(x) x$predictions)))
 
 # Plot the predictions for each social class
 # Arrange in a grid
 halfhr_ridge_plots <- list()
 for (class in as.character(soc_classes)) {
-  plot_title <- paste("Half-hourly demand predictions for", class)
+  best_K <- halfhr_ridge_results[[class]]$best_K
+  best_lambda <- halfhr_ridge_results[[class]]$best_lambda
+  plot_title <- paste("Half-hourly predictions for", class)
+  plot_subtitle <- paste0("Best K: ", best_K, "; Best lambda: ", best_lambda)
   p <- ggplot(halfhr_test_true_preds, aes(x = dateTime)) +
     geom_line(aes(y = .data[[class]]), color = "#414141") +
     geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
-    labs(title = plot_title, x = "Date", y = "Demand") +
+    labs(title = plot_title, subtitle = plot_subtitle, x = "Date", y = "Demand") +
     theme_bw()
   halfhr_ridge_plots[[class]] <- p
 }
 
-do.call(grid.arrange, c(halfhr_ridge_plots, ncol = 2))
+do.call(gridExtra::grid.arrange, c(halfhr_ridge_plots, ncol = 2))
+```
+
+We can also examine the MSE on the test set for each class:
+
+```{r}
+as.data.frame(lapply(halfhr_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+  # Remove _preds suffix from class column
+  mutate(class = gsub("_preds", "", class))
 ```
 
 ### Hour
@@ -273,27 +287,33 @@ Split the dataset into training and testing sets:
 # Split the data into training and test sets
 # 90% training set
 n_train_hr <- round(0.9*nrow(df_hr_scaled))
-hr_features_train <- df_hr_scaled[1:n_train_hr,]
+# Training and testing counter
 train_counter_hr <- df_hr_scaled$counter[1:n_train_hr]
-hr_features_test <- df_hr_scaled[-(1:n_train_hr),]
 test_counter_hr <- df_hr_scaled$counter[-(1:n_train_hr)]
+# Training and testing features
+hr_features_train <- df_hr_scaled[1:n_train_hr,] %>%
+  select(-counter)
+hr_features_test <- df_hr_scaled[-(1:n_train_hr),] %>%
+  select(-counter)
 ```
 
 Perform cross-validation:
 
 ```{r}
+# Range of lambda values
+lambda_values_hr <- seq(0.01, 1, length.out = 10) * nrow(hr_features_train)
 # lapply over social classes
 hr_ridge_results <- lapply(soc_classes, function(class) {
   y_class <- hr_features_train[[as.character(class)]]
   # Perform cross-validation
   cv_results <- parallel_ridge_cross_validation(
-    x_vars = as.matrix(hr_features_train[,7:ncol(hr_features_train)]), 
+    x_vars = as.matrix(hr_features_train[,7:ncol(hr_features_train)]),
     y_var = y_class,
-    time_counter = train_counter_hr, 
-    daily_period = 48,
-    annual_period = 48 * 365,
+    time_counter = train_counter_hr,
+    daily_period = 24,
+    annual_period = 24 * 365,
     max_K = 5,
-    lambda_values = lambda_values,
+    lambda_values = lambda_values_hr,
     n_folds = 10
   )
   return(cv_results)
@@ -301,12 +321,15 @@ hr_ridge_results <- lapply(soc_classes, function(class) {
 names(hr_ridge_results) <- soc_classes
 
 # Get predictions for each model on the test set
-hr_ridge_preds <- lapply(hr_ridge_results, function(cv_results) {
+hr_x_test <- as.matrix(hr_features_test[,7:ncol(hr_features_test)])
+hr_ridge_preds <- lapply(soc_classes, function(class) {
+  cv_results <- hr_ridge_results[[as.character(class)]]
   preds <- predict_parallel_ridge_cv(model = cv_results,
-                                     x_test = as.matrix(hr_features_test[,7:ncol(hr_features_test)]),
+                                     x_test = hr_x_test,
+                                     y_test = hr_features_test[[as.character(class)]],
                                      time_counter = test_counter_hr,
-                                     daily_period = 48,
-                                     annual_period = 48 * 365)
+                                     daily_period = 24,
+                                     annual_period = 24 * 365)
   return(preds)
 })
 names(hr_ridge_preds) <- paste0(soc_classes, "_preds")
@@ -314,27 +337,39 @@ names(hr_ridge_preds) <- paste0(soc_classes, "_preds")
 
 Visualize the predictions on the testing set:
 
-```{r}
+```{r fig.height=8}
 # Dataframe of true values and predictions on test set
-hr_test_true_preds <- hr_features_test %>% 
-  select(dateTime, all_of(soc_classes)) %>% 
+hr_test_true_preds <- hr_features_test %>%
+  select(dateTime, all_of(soc_classes)) %>%
   # Add predictions
-  bind_cols(as.data.frame(hr_ridge_preds))
+  bind_cols(as.data.frame(lapply(hr_ridge_preds, function(x) x$predictions)))
 
 # Plot the predictions for each social class
 # Arrange in a grid
 hr_ridge_plots <- list()
 for (class in as.character(soc_classes)) {
-  plot_title <- paste("Half-hourly demand predictions for", class)
+  best_K <- hr_ridge_results[[class]]$best_K
+  best_lambda <- hr_ridge_results[[class]]$best_lambda
+  plot_title <- paste("Hourly predictions for", class)
+  plot_subtitle <- paste0("Best K: ", best_K, "; Best lambda: ", best_lambda)
   p <- ggplot(hr_test_true_preds, aes(x = dateTime)) +
     geom_line(aes(y = .data[[class]]), color = "#414141") +
     geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
-    labs(title = plot_title, x = "Date", y = "Demand") +
+    labs(title = plot_title, subtitle = plot_subtitle, x = "Date", y = "Demand") +
     theme_bw()
   hr_ridge_plots[[class]] <- p
 }
 
-do.call(grid.arrange, c(hr_ridge_plots, ncol = 2))
+do.call(gridExtra::grid.arrange, c(hr_ridge_plots, ncol = 2))
+```
+
+Test set MSE:
+
+```{r}
+as.data.frame(lapply(hr_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+  # Remove _preds suffix from class column
+  mutate(class = gsub("_preds", "", class))
 ```
 
 ### Day
@@ -345,15 +380,21 @@ Split the dataset into training and testing sets:
 # Split the data into training and test sets
 # 90% training set
 n_train_day <- round(0.9*nrow(df_day_scaled))
-day_features_train <- df_day_scaled[1:n_train_day,]
+# Training and testing counter
 train_counter_day <- df_day_scaled$counter[1:n_train_day]
-day_features_test <- df_day_scaled[-(1:n_train_day),]
 test_counter_day <- df_day_scaled$counter[-(1:n_train_day)]
+# Training and testing features
+day_features_train <- df_day_scaled[1:n_train_day,] %>%
+  select(-counter)
+day_features_test <- df_day_scaled[-(1:n_train_day),] %>%
+  select(-counter)
 ```
 
 Perform cross-validation:
 
 ```{r}
+# Range of lambda values
+lambda_values_day <- seq(0.01, 1, length.out = 10) * nrow(day_features_train)
 # lapply over social classes
 day_ridge_results <- lapply(soc_classes, function(class) {
   y_class <- day_features_train[[as.character(class)]]
@@ -362,10 +403,10 @@ day_ridge_results <- lapply(soc_classes, function(class) {
     x_vars = as.matrix(day_features_train[,7:ncol(day_features_train)]), 
     y_var = y_class,
     time_counter = train_counter_day, 
-    daily_period = 48,
-    annual_period = 48 * 365,
+    daily_period = 1,
+    annual_period = 365,
     max_K = 5,
-    lambda_values = lambda_values,
+    lambda_values = lambda_values_day,
     n_folds = 10
   )
   return(cv_results)
@@ -373,12 +414,15 @@ day_ridge_results <- lapply(soc_classes, function(class) {
 names(day_ridge_results) <- soc_classes
 
 # Get predictions for each model on the test set
-day_ridge_preds <- lapply(day_ridge_results, function(cv_results) {
+day_x_test <- as.matrix(day_features_test[,7:ncol(day_features_test)])
+day_ridge_preds <- lapply(soc_classes, function(class) {
+  cv_results <- day_ridge_results[[as.character(class)]]
   preds <- predict_parallel_ridge_cv(model = cv_results,
-                                     x_test = as.matrix(day_features_test[,7:ncol(day_features_test)]),
+                                     x_test = day_x_test,
+                                     y_test = day_features_test[[as.character(class)]],
                                      time_counter = test_counter_day,
-                                     daily_period = 48,
-                                     annual_period = 48 * 365)
+                                     daily_period = 1,
+                                     annual_period = 365)
   return(preds)
 })
 names(day_ridge_preds) <- paste0(soc_classes, "_preds")
@@ -386,27 +430,39 @@ names(day_ridge_preds) <- paste0(soc_classes, "_preds")
 
 Visualize the predictions on the testing set:
 
-```{r}
+```{r fig.height=8}
 # Dataframe of true values and predictions on test set
 day_test_true_preds <- day_features_test %>% 
   select(dateTime, all_of(soc_classes)) %>% 
   # Add predictions
-  bind_cols(as.data.frame(day_ridge_preds))
+  bind_cols(as.data.frame(lapply(day_ridge_preds, function(x) x$predictions)))
 
 # Plot the predictions for each social class
 # Arrange in a grid
 day_ridge_plots <- list()
 for (class in as.character(soc_classes)) {
-  plot_title <- paste("Half-hourly demand predictions for", class)
+  best_K <- day_ridge_results[[class]]$best_K
+  best_lambda <- day_ridge_results[[class]]$best_lambda
+  plot_title <- paste("Daily predictions for", class)
+  plot_subtitle <- paste0("Best K: ", best_K, "; Best lambda: ", best_lambda)
   p <- ggplot(day_test_true_preds, aes(x = dateTime)) +
     geom_line(aes(y = .data[[class]]), color = "#414141") +
     geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
-    labs(title = plot_title, x = "Date", y = "Demand") +
+    labs(title = plot_title, subtitle = plot_subtitle, x = "Date", y = "Demand") +
     theme_bw()
   day_ridge_plots[[class]] <- p
 }
 
-do.call(grid.arrange, c(day_ridge_plots, ncol = 2))
+do.call(gridExtra::grid.arrange, c(day_ridge_plots, ncol = 2))
+```
+
+Test set MSE:
+
+```{r}
+as.data.frame(lapply(day_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+  # Remove _preds suffix from class column
+  mutate(class = gsub("_preds", "", class))
 ```
 
 # Gaussian Process Regression

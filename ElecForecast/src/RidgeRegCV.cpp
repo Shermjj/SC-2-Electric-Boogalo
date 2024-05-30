@@ -139,8 +139,9 @@ List parallel_ridge_cross_validation(NumericMatrix x_vars,
 }
 
 // [[Rcpp::export]]
-NumericVector predict_parallel_ridge_cv(List model,
+List predict_parallel_ridge_cv(List model,
                                         NumericMatrix x_test,
+                                        NumericVector y_test,
                                         NumericVector time_counter,
                                         double daily_period,
                                         double annual_period) {
@@ -167,6 +168,10 @@ NumericVector predict_parallel_ridge_cv(List model,
   arma::colvec coeffs = Rcpp::as<arma::colvec>(final_model["coefficients"]);
   arma::vec predictions = makePredictions(convertAndProcess(x_final), coeffs);
   
-  return wrap(predictions);
+  // Calculate MSE
+  arma::colvec resid = Rcpp::as<arma::colvec>(y_test) - predictions;
+  double sig2 = arma::as_scalar(arma::trans(resid) * resid / n_test);
+  
+  return List::create(Named("error") = sig2, Named("predictions") = predictions);
 }
 

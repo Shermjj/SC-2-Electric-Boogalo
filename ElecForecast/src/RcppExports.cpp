@@ -82,17 +82,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // predict_parallel_ridge_cv
-NumericVector predict_parallel_ridge_cv(List model, NumericMatrix x_test, NumericVector time_counter, double daily_period, double annual_period);
-RcppExport SEXP _ElecForecast_predict_parallel_ridge_cv(SEXP modelSEXP, SEXP x_testSEXP, SEXP time_counterSEXP, SEXP daily_periodSEXP, SEXP annual_periodSEXP) {
+List predict_parallel_ridge_cv(List model, NumericMatrix x_test, NumericVector y_test, NumericVector time_counter, double daily_period, double annual_period);
+RcppExport SEXP _ElecForecast_predict_parallel_ridge_cv(SEXP modelSEXP, SEXP x_testSEXP, SEXP y_testSEXP, SEXP time_counterSEXP, SEXP daily_periodSEXP, SEXP annual_periodSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< List >::type model(modelSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type x_test(x_testSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type y_test(y_testSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type time_counter(time_counterSEXP);
     Rcpp::traits::input_parameter< double >::type daily_period(daily_periodSEXP);
     Rcpp::traits::input_parameter< double >::type annual_period(annual_periodSEXP);
-    rcpp_result_gen = Rcpp::wrap(predict_parallel_ridge_cv(model, x_test, time_counter, daily_period, annual_period));
+    rcpp_result_gen = Rcpp::wrap(predict_parallel_ridge_cv(model, x_test, y_test, time_counter, daily_period, annual_period));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -103,7 +104,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ElecForecast_RidgeReg", (DL_FUNC) &_ElecForecast_RidgeReg, 3},
     {"_ElecForecast_RidgeRegPar", (DL_FUNC) &_ElecForecast_RidgeRegPar, 3},
     {"_ElecForecast_parallel_ridge_cross_validation", (DL_FUNC) &_ElecForecast_parallel_ridge_cross_validation, 8},
-    {"_ElecForecast_predict_parallel_ridge_cv", (DL_FUNC) &_ElecForecast_predict_parallel_ridge_cv, 5},
+    {"_ElecForecast_predict_parallel_ridge_cv", (DL_FUNC) &_ElecForecast_predict_parallel_ridge_cv, 6},
     {NULL, NULL, 0}
 };
 
