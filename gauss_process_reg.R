@@ -21,7 +21,7 @@ gaussian_process_reg <- function(data,
                                  class = "DE",
                                  kernel = "rbfdot",
                                  plot = FALSE,
-                                 sigma = 100) {
+                                 sigma = 1000) {
 
   #Training and test set, first 90% of data is training, last 10% is test
   train_index <- round(nrow(data) * 0.9)
@@ -51,7 +51,7 @@ gaussian_process_reg <- function(data,
   # Include Plots ?
   if (plot){
     pl <- ggplot(data_with_pred, aes(x = counter)) +
-      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.5) +
+      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.2) +
       geom_line(aes(y = mean), color = class_colours[class]) +
       labs(title = paste("GPR model predictions for class", class),
            x = "Date", y = "Demand")
@@ -92,20 +92,35 @@ class_colours <- c("DE" = "#ff0000",
 
 
 for (class_name in class_names) {
-  # Perform Gaussian Process Regression on the class
+  df_half_hour <- df_half_hour[1:336,]
+   #Perform Gaussian Process Regression on the class
   gpr_result <- gaussian_process_reg(df_half_hour, class = class_name, plot = TRUE)
   df <- gpr_result$data
-  saveRDS(df, file = paste0("data/data_gpr/df_half_hour_gpr_",class_name,".RData"))
-  jpeg(filename = paste0("data/plots_gpr/half_hour__",class_name,".jpeg"), width = 1500, height = 1500, res = 300)
+  saveRDS(df, file = paste0("data/data_gpr/df_half_hourWEEK_gpr_",class_name,".RData"))
+  jpeg(filename = paste0("data/plots_gpr/half_hourWEEK_",class_name,".jpeg"), width = 1500, height = 1500, res = 300)
   print(gpr_result$plot)
   dev.off()
   
   all_plots[[class_name]] <- gpr_result$plot
 }
 
+# Initialize an empty list to store the plots
+all_plots <- list()
 
-# Combine all the plots into a single plot
-#combined_plot <- patchwork::wrap_plots(all_plots, ncol = 1)
-#png(filename = "data/plots_gpr/hourlycombinedfirsthalf.png")
-#print(combined_plot)
-#dev.off()
+# List of class names
+class_names <- list("DE", "C1", "C2", "AB", "F")
+
+display_plots <- function(class_name) {
+  # Load the data
+  df <- readRDS(file = paste0("data/data_gpr/df_hour_gpr_", class_name, ".RData"))
+  df <- df[1:168,]
+  # Create a plot
+  p <- ggplot(df, aes(x = counter)) +
+    geom_point(aes(y = get(class_name)), color = "#5a5a5a", size = 0.5) +
+    geom_line(aes(y = mean), color = class_colours[class_name]) +
+    labs(title = paste("GPR model predictions for class", class_name),
+         x = "Date", y = "Demand")
+  
+  # Return the plot
+  return(p)
+}

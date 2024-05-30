@@ -579,7 +579,6 @@ find_optimal_params <- function(X, y) {
   # Return the optimal parameters
   return(theta)
 }
-
 ```
 
 
@@ -697,7 +696,7 @@ Unfortunately, as a side affect of the gaussian kernel, we has considerable trai
 
 ### Aggregated Hourly Data
 
-For hourly data, things are certainly a bit more messy, we theorize that the with more tuning of the hyperparameters we would get closer approximation of the daily cycles - whihc was not an issue with daily aggregated data.
+For hourly data, things are certainly a bit more messy, we theorize that the with more tuning of the hyperparameters we would get closer approximation of the daily cycles - which was not an issue with daily aggregated data. This is clearly an the outlier as we will see from the half-hourly data.
 
 ```{r}
 
@@ -715,6 +714,15 @@ print(combined_plot2)
 
 ### Aggregated Half-Hourly Data
 
+Unfortunately the amount of data would make it impossible to see any results, so we limit our view to the first week of the year, where we can more easily make out the models fit.
+
+```{r}
+
+image_files3 <- c(here::here("data/plots_gpr/half_hourWEEK_AB.jpeg"),
+                  here::here("data/plots_gpr/half_hourWEEK_C1.jpeg"),
+                  here::here("data/plots_gpr/half_hourWEEK_C2.jpeg"),
+                  here::here("data/plots_gpr/half_hourWEEK_DE.jpeg"),
+                  here::here("data/plots_gpr/half_hourWEEK_F.jpeg"))
 
 ### Conclusions
 
