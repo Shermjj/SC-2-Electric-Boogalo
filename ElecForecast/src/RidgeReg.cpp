@@ -6,7 +6,50 @@
 #include <RcppParallel.h>
 using namespace Rcpp;
 using namespace RcppParallel;
-
+//' Matrix Multiplier Worker for Parallel Matrix Multiplication
+//'
+//' This worker class is used for parallel computation of the matrix product `X'X`
+//' where `X'` is the transpose of `X`. The class uses the RcppParallel package to
+//' leverage multicore processing, improving performance for large matrices.
+//'
+//' @section Fields:
+//' \itemize{
+//'   \item \code{X}: Constant reference to an `arma::mat` representing the input matrix.
+//'   \item \code{XtX}: Reference to an `arma::mat` where the result `X'X` is stored.
+//' }
+//'
+//' @section Methods:
+//' \describe{
+//'   \item{Constructor}{Initializes the class with the input matrix and the output matrix references.}
+//'   \item{operator()}{Performs the matrix multiplication operation over a specified range of rows, to be used by RcppParallel.}
+//' }
+//'
+//' @details
+//' The operator() method is designed to be called by RcppParallel, and it divides the task of computing
+//' the matrix multiplication across multiple threads. Each thread computes a portion of the resulting
+//' matrix, specifically, the contributions to `XtX` from rows `begin` to `end` of matrix `X`.
+//'
+//' @examples
+//' \dontrun{
+//' library(Rcpp)
+//' library(RcppParallel)
+//' sourceCpp("path/to/MatrixMultiplier.cpp") // Ensure this path points to the file containing the class
+//'
+//' # Create a random matrix
+//' X <- matrix(rnorm(100 * 10), ncol = 10)
+//' XtX <- matrix(0, ncol = 10, nrow = 10)
+//'
+//' # Create and use the worker
+//' worker <- MatrixMultiplier(X, XtX)
+//' parallelFor(0, nrow(X), worker)
+//'
+//' print(XtX) # This should print the result of X'X
+//' }
+//'
+//' @importFrom Rcpp sourceCpp
+//' @importFrom RcppParallel parallelFor
+//' @export
+//'
 struct MatrixMultiplier : public Worker {
   // Inputs
   const arma::mat& X;
@@ -27,7 +70,51 @@ struct MatrixMultiplier : public Worker {
   }
 };
 
-// Function to perform ridge regression and compute CV error
+//' Ridge Regression with Intercept
+//'
+//' Performs ridge regression on a given set of predictors and a response variable. 
+//' This function adds an intercept to the model by appending a column of ones to 
+//' the predictor matrix `X`. It computes the ridge regression coefficients by 
+//' penalizing the magnitude of the coefficients through a regularization term `lambda`.
+//' The intercept term is not penalized.
+//'
+//' @param X A numeric matrix of predictor variables where each row is an observation 
+//'          and each column is a predictor.
+//' @param y A numeric vector of the response variable corresponding to each observation.
+//' @param lambda A numeric value specifying the regularization strength (lambda >= 0).
+//'
+//' @return An R list containing:
+//' \itemize{
+//'   \item \code{error}: The mean squared error of the model residuals.
+//'   \item \code{coefficients}: A numeric vector of the estimated coefficients, including the intercept.
+//' }
+//'
+//' @details
+//' The regularization term is added to the diagonal of the cross-product matrix of the
+//' predictors (including the intercept), except for the first diagonal element which corresponds
+//' to the intercept. This adjustment ensures that the intercept is not shrunk towards zero.
+//' The solution to the ridge regression problem is computed using the matrix inversion lemma,
+//' which ensures numerical stability and efficiency.
+//'
+//' @examples
+//' \dontrun{
+//' library(Rcpp)
+//' sourceCpp("path/to/RidgeReg.cpp") // Ensure this path points to the file containing the function
+//'
+//' # Simulate some data
+//' set.seed(123)
+//' X <- matrix(rnorm(100 * 10), ncol = 10)
+//' y <- X %*% rnorm(10) + rnorm(100)
+//' lambda <- 0.5
+//'
+//' # Perform ridge regression
+//' results <- RidgeReg(X, y, lambda)
+//' print(results$error)
+//' print(results$coefficients)
+//' }
+//'
+//' @importFrom Rcpp sourceCpp
+//' @export
 // [[Rcpp::export]]
 List RidgeReg(const arma::mat& X, const arma::vec& y, double lambda) {
   int n = X.n_rows;
@@ -48,7 +135,53 @@ List RidgeReg(const arma::mat& X, const arma::vec& y, double lambda) {
   
   return List::create(_["error"] = sig2, _["coefficients"] = coef);
 }
-
+//' Parallel Ridge Regression with Intercept
+//'
+//' Computes the coefficients of a ridge regression model using parallel computing
+//' to handle the matrix multiplications. The function includes an intercept in the
+//' model by appending a column of ones to the matrix `X`. It uses parallelization
+//' to efficiently compute the cross-product matrix `X'X`, and it applies ridge
+//' regularization by adding a lambda penalty to the diagonal elements of the matrix,
+//' except for the intercept term.
+//'
+//' @param X A numeric matrix of predictor variables, where each row represents an 
+//'          observation and each column a predictor.
+//' @param y A numeric vector of the response variable corresponding to each observation.
+//' @param lambda A double specifying the strength of the regularization (lambda >= 0).
+//'
+//' @return An R list containing:
+//' \itemize{
+//'   \item \code{error}: The mean squared error of the model residuals.
+//'   \item \code{coefficients}: A numeric vector of the estimated coefficients, including the intercept.
+//' }
+//'
+//' @details
+//' The function utilizes the `RcppParallel` package for parallel processing. It employs
+//' the `MatrixMultiplier` worker class to perform the multiplication of `X'X` in parallel,
+//' speeding up the computation significantly, especially for large datasets. The intercept
+//' is not regularized, consistent with standard ridge regression practices.
+//'
+//' @examples
+//' \dontrun{
+//' library(Rcpp)
+//' library(RcppParallel)
+//' sourceCpp("path/to/RidgeRegPar.cpp") // Ensure this path points to the file containing the function
+//'
+//' # Simulate some data
+//' set.seed(123)
+//' X <- matrix(rnorm(100 * 10), ncol = 10)
+//' y <- X %*% rnorm(10) + rnorm(100)
+//' lambda <- 0.5
+//'
+//' # Perform parallel ridge regression
+//' results <- RidgeRegPar(X, y, lambda)
+//' print(results$error)
+//' print(results$coefficients)
+//' }
+//'
+//' @importFrom Rcpp sourceCpp
+//' @importFrom RcppParallel parallelFor
+//' @export
 // [[Rcpp::export]]
 List RidgeRegPar(const arma::mat& X, const arma::vec& y, double lambda) {
   int n = X.n_rows;

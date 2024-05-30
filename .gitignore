@@ -12,9 +12,6 @@
 # Example code in package build process
 *-Ex.R
 
-# Output files from R CMD build
-/*.tar.gz
-
 # Output files from R CMD check
 /*.Rcheck/
 
@@ -49,4 +46,17 @@ po/*~
 rsconnect/
 
 # Knitting stuff
-notes/main_files/figure-latex/*
+notes/main_files/*
+
+# C++ objects and libs
+*.slo
+*.lo
+*.o
+*.a
+*.la
+*.lai
+*.so
+*.so.*
+*.dll
+*.dylib
+

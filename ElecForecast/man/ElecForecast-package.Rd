@@ -3,26 +3,23 @@
 \alias{ElecForecast}
 \docType{package}
 \title{
-  A short title line describing what the package does
+  Electricity consumption forecasting
 }
 \description{
-  A more detailed description of what the package does. A length
-  of about one to five lines is recommended.
+  Time-series forecasting models focused on electricity consumption
 }
 \details{
-  This section should provide a more detailed overview of how to use the
-  package, including the most important functions.
+  We focus on two types of models, a Ridge Regression model and a Bayesian Gaussian Process Regression
 }
 \author{
-Your Name, email optional.
+Kieran, Cecina, Sherman
 
-Maintainer: Your Name <your@email.com>
+Maintainer: Sherman Khoo <sherman.khoo@bristol.ac.uk>
 }
 \references{
-  This optional section can contain literature or other references for
-  background information.
+Ref.
 }
-\keyword{ package }
+\keyword{ Time-series }
 \seealso{
   Optional links to other man pages
 }

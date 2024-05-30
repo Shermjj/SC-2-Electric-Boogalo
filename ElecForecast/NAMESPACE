@@ -1,6 +1,14 @@
+# Load the shared library
 useDynLib(ElecForecast, .registration=TRUE)
+
+# Import specific functions from other packages
 importFrom(Rcpp, evalCpp)
-importFrom("stats", "as.formula", "lm")
 importFrom(RcppParallel, RcppParallelLibs)
+importFrom(stats, as.formula, lm)
+importFrom(kernlab, gausspr)
+importFrom(caret, postResample)
+importFrom(dplyr, left_join)
+importFrom(ggplot2, ggplot, aes, geom_point, geom_line, labs)
+
+# Automatically export all names that match a pattern
 exportPattern("^[[:alpha:]]+")
-importFrom(RcppParallel,RcppParallelLibs)

@@ -1,6 +1,42 @@
-#' Performs Gaussian Process Regression
-#' 
-#' @param data,class,kernel,plot,sigma
+#' Gaussian Process Regression for Demand Estimation
+#'
+#' This function applies Gaussian Process Regression (GPR) using the \code{kernlab::gausspr} function
+#' to model and predict the specified class variable based on a subset of predictor variables from the dataset.
+#' It splits the data into training and test sets, trains the GPR model, evaluates its performance,
+#' and optionally generates a plot of the predictions.
+#'
+#' @param data A data frame containing the variables of interest.
+#' @param class A character string specifying the column name of the dependent variable.
+#' @param kernel A character string specifying the kernel function to use in the GPR model.
+#'               Default is "rbfdot", which indicates a radial basis function kernel.
+#' @param plot Logical; if TRUE, a plot of the GPR predictions versus actual data will be displayed.
+#' @param sigma Numeric; the sigma parameter for the kernel function, controlling the width of the kernel.
+#'              Default value is 100.
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{model}: The trained GPR model object.
+#'   \item \code{data}: The input data frame with an additional column for the mean predictions.
+#'   \item \code{performance}: A list with performance metrics including RMSE, R squared, etc.
+#'   \item \code{plot}: An optional ggplot object visualizing the actual data and the GPR predictions.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' data <- data.frame(toy = seq(as.Date("2020-01-01"), by = "day", length.out = 100),
+#'                    temp = rnorm(100, mean = 15, sd = 5),
+#'                    DE = rnorm(100, mean = 200, sd = 20))
+#' gpr_results <- gaussian_process_reg(data,
+#'                                     class = "DE",
+#'                                     kernel = "rbfdot",
+#'                                     plot = TRUE,
+#'                                     sigma = 50)
+#' }
+#'
+#' @importFrom kernlab gausspr
+#' @importFrom caret postResample
+#' @importFrom dplyr left_join
+#' @importFrom ggplot2 ggplot aes geom_point geom_line labs
 #' @export
 gaussian_process_reg <- function(data,
                                  class = "DE",
