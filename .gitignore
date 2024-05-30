@@ -45,6 +45,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# Knitting stuff
+notes/main_files/*
+
 # C++ objects and libs
 *.slo
 *.lo
@@ -56,3 +59,4 @@ rsconnect/
 *.so.*
 *.dll
 *.dylib
+
