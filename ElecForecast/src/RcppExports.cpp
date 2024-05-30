@@ -97,6 +97,24 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// parallel_ridge_cross_validation2
+List parallel_ridge_cross_validation2(NumericMatrix x_vars, NumericVector y_var, NumericVector time_counter, double daily_period, double annual_period, int max_K, std::vector<double> lambda_values, int n_folds);
+RcppExport SEXP _ElecForecast_parallel_ridge_cross_validation2(SEXP x_varsSEXP, SEXP y_varSEXP, SEXP time_counterSEXP, SEXP daily_periodSEXP, SEXP annual_periodSEXP, SEXP max_KSEXP, SEXP lambda_valuesSEXP, SEXP n_foldsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type x_vars(x_varsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type y_var(y_varSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type time_counter(time_counterSEXP);
+    Rcpp::traits::input_parameter< double >::type daily_period(daily_periodSEXP);
+    Rcpp::traits::input_parameter< double >::type annual_period(annual_periodSEXP);
+    Rcpp::traits::input_parameter< int >::type max_K(max_KSEXP);
+    Rcpp::traits::input_parameter< std::vector<double> >::type lambda_values(lambda_valuesSEXP);
+    Rcpp::traits::input_parameter< int >::type n_folds(n_foldsSEXP);
+    rcpp_result_gen = Rcpp::wrap(parallel_ridge_cross_validation2(x_vars, y_var, time_counter, daily_period, annual_period, max_K, lambda_values, n_folds));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_ElecForecast_GenFT", (DL_FUNC) &_ElecForecast_GenFT, 3},
@@ -105,6 +123,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ElecForecast_RidgeRegPar", (DL_FUNC) &_ElecForecast_RidgeRegPar, 3},
     {"_ElecForecast_parallel_ridge_cross_validation", (DL_FUNC) &_ElecForecast_parallel_ridge_cross_validation, 8},
     {"_ElecForecast_predict_parallel_ridge_cv", (DL_FUNC) &_ElecForecast_predict_parallel_ridge_cv, 6},
+    {"_ElecForecast_parallel_ridge_cross_validation2", (DL_FUNC) &_ElecForecast_parallel_ridge_cross_validation2, 8},
     {NULL, NULL, 0}
 };
 
