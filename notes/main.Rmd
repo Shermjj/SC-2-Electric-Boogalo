@@ -636,5 +636,90 @@ gaussian_process_reg <- function(data,
 ```
 
 
-# Results
+## Results
+
+
+We began by running our `Rcpp` code to find optimal hyperparameters for the Gaussian Process Regression model. We found that the optimal hyperparameters for the half-hourly, hourly, and daily datasets were as follows:
+
+- Half-hourly: $l = 0.01, \sigma = 12062$
+- Hourly: $l = 0.5, \sigma = 982$
+- Daily: $l = 1, \sigma = 104$
+
+We then ran the Gaussian Process Regression model on the three datasets. We can see the results below:
+
+```{r,warning = FALSE,message = FALSE}
+# Load Day Data
+df_day_AB <- readRDS(here::here("data/data_gpr/df_day_gpr_AB.RData"))
+df_day_C1 <- readRDS(here::here("data/data_gpr/df_day_gpr_C1.RData"))
+df_day_C2 <- readRDS(here::here("data/data_gpr/df_day_gpr_C2.RData"))
+df_day_DE <- readRDS(here::here("data/data_gpr/df_day_gpr_DE.RData"))
+df_day_F <- readRDS(here::here("data/data_gpr/df_day_gpr_F.RData"))
+
+# Load Hour Data
+df_hr_AB <- readRDS(here::here("data/data_gpr/df_hour_gpr_AB.RData"))
+df_hr_C1 <- readRDS(here::here("data/data_gpr/df_hour_gpr_C1.RData"))
+df_hr_C2 <- readRDS(here::here("data/data_gpr/df_hour_gpr_C2.RData"))
+df_hr_DE <- readRDS(here::here("data/data_gpr/df_hour_gpr_DE.RData"))
+
+
+```
+
+### Aggregated Daily Data
+
+For daily data, we had a very good fit with our estimated `sigma` and `l` values. 
+
+```{r}
+library(jpeg)
+library(grid)
+library(cowplot)
+
+image_files <- c(here::here("data/plots_gpr/day_AB.jpeg"),
+                  here::here("data/plots_gpr/day_C1.jpeg"),
+                  here::here("data/plots_gpr/day_C2.jpeg"),
+                  here::here("data/plots_gpr/day_DE.jpeg"),
+                  here::here("data/plots_gpr/day_F.jpeg"))
+
+image_to_grob <- function(image_file) {
+  img <- readJPEG(image_file)
+  rasterGrob(img)
+}
+
+
+all_grobs <- lapply(image_files, image_to_grob)
+
+combined_plot <- plot_grid(plotlist = all_grobs,ncol = 2)
+
+
+print(combined_plot)
+```
+
+Unfortunately, as a side affect of the gaussian kernel, we has considerable trail off at the end of the data. Meaning the `mse` on our test set is quite high. In terms of general fit for the training set it performs quite well.
+
+### Aggregated Hourly Data
+
+For hourly data, things are certainly a bit more messy, we theorize that the with more tuning of the hyperparameters we would get closer approximation of the daily cycles - whihc was not an issue with daily aggregated data.
+
+```{r}
+
+image_files2 <- c(here::here("data/plots_gpr/hour__AB.jpeg"),
+                  here::here("data/plots_gpr/hour__C1.jpeg"),
+                  here::here("data/plots_gpr/hour__C2.jpeg"),
+                  here::here("data/plots_gpr/hour__DE.jpeg"))
+
+
+all_grobs2 <- lapply(image_files2, image_to_grob)
+combined_plot2 <- plot_grid(plotlist = all_grobs2,ncol = 2)
+
+print(combined_plot2)
+```
+
+### Aggregated Half-Hourly Data
+
+
+### Conclusions
+
+Unfortunately, despite considerble speed up of the optimisation, the `Rcpp` code did not provide us hyperparameters that were particularly useful from the hour and half-hourly data, however this may be due to the range and size of the data considering daily data was quite successful. 
+
+# BEEG COMPARISON
+
 
