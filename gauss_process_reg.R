@@ -21,7 +21,7 @@ gaussian_process_reg <- function(data,
                                  class = "DE",
                                  kernel = "rbfdot",
                                  plot = FALSE,
-                                 sigma = 10000) {
+                                 sigma = 100) {
 
   #Training and test set, first 90% of data is training, last 10% is test
   train_index <- round(nrow(data) * 0.9)
@@ -46,19 +46,20 @@ gaussian_process_reg <- function(data,
   test_mean_func <- predict(gpr_model, as.vector(test_set$counter))
   performance <- postResample(pred = test_mean_func, obs = test_set$DE)
 
+  print(head(data_with_pred))
+  print("-------------------")
   # Include Plots ?
   if (plot){
     pl <- ggplot(data_with_pred, aes(x = counter)) +
-      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.75) +
+      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.5) +
       geom_line(aes(y = mean), color = class_colours[class]) +
-      labs(title = "GPR model predictions",
+      labs(title = paste("GPR model predictions for class", class),
            x = "Date", y = "Demand")
-    pl
   } else {
     pl <- NULL
   }
   return(list(model = gpr_model,
-              data <- data_with_pred,
+              data = data_with_pred,
               performance,
               plot = pl))
 }
@@ -83,7 +84,7 @@ find_optimal_params <- function(X, y) {
 all_plots <- list()
 
 class_names <- list("DE", "C1", "C2", "AB", "F")
-class_colours <- c("DE" = "#9900ff",
+class_colours <- c("DE" = "#ff0000",
                    "C1" = "#d95f02",
                    "C2" = "#0059ff",
                    "AB" = "#e7298a",
@@ -93,13 +94,12 @@ class_colours <- c("DE" = "#9900ff",
 for (class_name in class_names) {
   # Perform Gaussian Process Regression on the class
   gpr_result <- gaussian_process_reg(df_half_hour, class = class_name, plot = TRUE)
-  print(class_name)
   df <- gpr_result$data
-  save(df, file = paste("data/data_gpr/df_half_hour_gpr_", class_name, ".RData"))
-  # Add the plot to all_plots
-  #png(filename = paste("data/plots_gpr/hourly", class_name, ".png"))
+  saveRDS(df, file = paste0("data/data_gpr/df_half_hour_gpr_",class_name,".RData"))
+  jpeg(filename = paste0("data/plots_gpr/half_hour__",class_name,".jpeg"), width = 1500, height = 1500, res = 300)
   print(gpr_result$plot)
-  #dev.off()
+  dev.off()
+  
   all_plots[[class_name]] <- gpr_result$plot
 }
 
