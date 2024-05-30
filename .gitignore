@@ -47,3 +47,6 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Knitting stuff
+notes/main_files/figure-latex/*
