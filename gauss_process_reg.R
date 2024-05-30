@@ -21,7 +21,7 @@ gaussian_process_reg <- function(data,
                                  class = "DE",
                                  kernel = "rbfdot",
                                  plot = FALSE,
-                                 sigma = 1000) {
+                                 sigma = 10000) {
 
   #Training and test set, first 90% of data is training, last 10% is test
   train_index <- round(nrow(data) * 0.9)
@@ -92,10 +92,10 @@ class_colours <- c("DE" = "#9900ff",
 
 for (class_name in class_names) {
   # Perform Gaussian Process Regression on the class
-  gpr_result <- gaussian_process_reg(df_hour, class = class_name, plot = TRUE)
+  gpr_result <- gaussian_process_reg(df_half_hour, class = class_name, plot = TRUE)
   print(class_name)
   df <- gpr_result$data
-  save(df, file = paste("data/data_gpr/df_hour_gpr_", class_name, ".RData"))
+  save(df, file = paste("data/data_gpr/df_half_hour_gpr_", class_name, ".RData"))
   # Add the plot to all_plots
   #png(filename = paste("data/plots_gpr/hourly", class_name, ".png"))
   print(gpr_result$plot)
