@@ -27,6 +27,44 @@ arma::vec makePredictions(const arma::mat& x_test, const arma::colvec& coefficie
   return predictions;
 }
 
+//' Perform Cross-Validation for Ridge Regression with Fourier Transform Features
+//'
+//' This function performs k-fold cross-validation for ridge regression models on a dataset
+//' with options to include Fourier transform features for both daily and annual periodic components.
+//' It leverages parallel computation to efficiently handle large datasets and multiple model configurations.
+//'
+//' @param x_vars Numeric matrix of predictor variables.
+//' @param y_var Numeric vector of response variable.
+//' @param time_counter Numeric vector representing time points for generating Fourier terms.
+//' @param daily_period Double specifying the period for daily Fourier terms.
+//' @param annual_period Double specifying the period for annual Fourier terms.
+//' @param max_K Integer specifying the maximum number of harmonics to consider.
+//' @param lambda_values Vector of doubles representing different lambda values for ridge penalty.
+//' @param n_folds Integer specifying the number of folds for cross-validation.
+//'
+//' @return A list containing the optimal number of harmonics (`best_K`), the optimal lambda value (`best_lambda`),
+//'         the mean squared error results for each model configuration (`mse_results`), and the final model trained on the entire dataset (`final_model`).
+//'
+//' @details The function first generates Fourier terms for daily and annual periods up to the maximum number of harmonics specified by `max_K`.
+//' It then evaluates the performance of ridge regression models across different combinations of lambda values and number of harmonics
+//' using the specified number of folds for cross-validation.
+//' The function identifies the best performing model configuration in terms of mean squared error and uses it to train a final model on the entire dataset.
+//' This final model and its parameters are returned as part of the results list.
+//'
+//' @examples
+//' \dontrun{
+//' x_vars <- matrix(rnorm(1000), ncol = 10)
+//' y_var <- rnorm(100)
+//' time_counter <- seq(1, 100, by = 1)
+//' results <- parallel_ridge_cross_validation(x_vars, y_var, time_counter, 1, 365, 5, c(0.1, 1, 10), 10)
+//' print(results$best_lambda)
+//' print(results$best_K)
+//' print(results$mse_results)
+//' print(results$final_model)
+//' }
+//' @importFrom Rcpp sourceCpp
+//' @importFrom RcppParallel parallelFor
+//' @export
 // [[Rcpp::export]]
 List parallel_ridge_cross_validation(NumericMatrix x_vars,
                                               NumericVector y_var,
@@ -138,6 +176,30 @@ List parallel_ridge_cross_validation(NumericMatrix x_vars,
                       Named("final_model") = final_model);
 }
 
+//' Make Predictions Using a Trained Parallel Ridge Regression Model
+//'
+//' This function uses a trained parallel ridge regression model to make predictions on new test data. It also computes and returns the mean squared error of the predictions.
+//'
+//' @param model A list containing the trained ridge regression model and its parameters.
+//' @param x_test Numeric matrix of new test predictor variables.
+//' @param y_test Numeric vector of new test response variables.
+//' @param time_counter Numeric vector representing time points for generating Fourier terms.
+//' @param daily_period Double specifying the period for daily Fourier terms.
+//' @param annual_period Double specifying the period for annual Fourier terms.
+//'
+//' @return A list containing the mean squared error (`error`) and the predictions.
+//'
+//' @examples
+//' \dontrun{
+//' # Assuming `results` is obtained from `parallel_ridge_cross_validation`
+//' test_data <- matrix(rnorm(200), ncol = 10)
+//' test_response <- rnorm(20)
+//' prediction_results <- predict_parallel_ridge_cv(results$final_model, test_data, test_response, seq(1, 20, by = 1), 1, 365)
+//' print(prediction_results$error)
+//' print(prediction_results$predictions)
+//' }
+//' @importFrom Rcpp sourceCpp
+//' @export
 // [[Rcpp::export]]
 List predict_parallel_ridge_cv(List model,
                                         NumericMatrix x_test,
