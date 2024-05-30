@@ -678,9 +678,7 @@ Unfortunately, as a side affect of the gaussian kernel, we has considerable trai
 
 ### Aggregated Hourly Data
 
-For hourly data, we can clearly see the daily cycles appearing, fortunately our GPR is able to get a pretty accurate fit, including the daily peaks of electricity consumption.
-
-things are certainly a bit more messy, we theorize that the with more tuning of the hyperparameters we would get closer approximation of the daily cycles - which was not an issue with daily aggregated data. This is clearly an the outlier as we will see from the half-hourly data.
+For hourly data, we can clearly see the daily cycles appearing, fortunately our GPR is able to get a pretty accurate fit, including the daily peaks of electricity consumption. The same `sigma` was applied to the yearly set (and can be found in the `data` file in the github rep) and it performed much worse, but that's to be expected.
 
 ```{r}
 
@@ -699,7 +697,7 @@ print(combined_plot2)
 
 ### Aggregated Half-Hourly Data
 
-Unfortunately the amount of data would make it impossible to see any results, so we limit our view to the first week of the year, where we can more easily make out the models fit.
+Similarly to the hourly data, the half-hourly data has daily cycles, but with an additional peak early on in the day - perhaps the coronation street kettle myth in action?
 
 ```{r}
 
@@ -718,7 +716,7 @@ print(combined_plot3)
 
 ### Conclusions
 
-Unfortunately, despite considerble speed up of the optimisation, the `Rcpp` code did not provide us hyperparameters that were particularly useful from the hour and half-hourly data, however this may be due to the range and size of the data considering daily data was quite successful. 
+Despite good fits on the cyclic data, the gaussian process regression has terrible predictive ability for the future. Further tests could be done to demonstrate its effectiveness on a random test set sampled from the data, which we predict it would perform much better on.
 
 # BEEG COMPARISON
 
