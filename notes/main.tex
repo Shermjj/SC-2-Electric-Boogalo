@@ -4,17 +4,20 @@
 %
 \documentclass[
 ]{article}
-\usepackage{lmodern}
-\usepackage{amssymb,amsmath}
-\usepackage{ifxetex,ifluatex}
-\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
   \usepackage[T1]{fontenc}
   \usepackage[utf8]{inputenc}
   \usepackage{textcomp} % provide euro and other symbols
 \else % if luatex or xetex
-  \usepackage{unicode-math}
+  \usepackage{unicode-math} % this also loads fontspec
   \defaultfontfeatures{Scale=MatchLowercase}
   \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
 \fi
 % Use upquote if available, for straight quotes in verbatim environments
 \IfFileExists{upquote.sty}{\usepackage{upquote}}{}
@@ -33,14 +36,6 @@
   \KOMAoptions{parskip=half}}
 \makeatother
 \usepackage{xcolor}
-\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
-\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
-\hypersetup{
-  pdftitle={SC-2 Electric Boogalo},
-  pdfauthor={Kieran Morris, Cecina Babich Morrow and Sherman Kjo},
-  hidelinks,
-  pdfcreator={LaTeX via pandoc}}
-\urlstyle{same} % disable monospaced font for URLs
 \usepackage[margin=1in]{geometry}
 \usepackage{color}
 \usepackage{fancyvrb}
@@ -53,13 +48,13 @@
 \newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
 \newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
 \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
-\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
 \newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
 \newcommand{\BuiltInTok}[1]{#1}
 \newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
 \newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
 \newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
-\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
 \newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
 \newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
 \newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
@@ -67,7 +62,7 @@
 \newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
 \newcommand{\ExtensionTok}[1]{#1}
 \newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
-\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
 \newcommand{\ImportTok}[1]{#1}
 \newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
 \newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
@@ -76,7 +71,7 @@
 \newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
 \newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
 \newcommand{\RegionMarkerTok}[1]{#1}
-\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
 \newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
 \newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
 \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
@@ -99,6 +94,17 @@
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \setcounter{secnumdepth}{5}
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={SC-2 Electric Boogalo},
+  pdfauthor={Kieran Morris, Cecina Babich Morrow and Sherman Kjo},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
 
 \title{SC-2 Electric Boogalo}
 \usepackage{etoolbox}
@@ -148,12 +154,11 @@ from the \texttt{electBook} package. We have three datasets:
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Extract individual dataframes}
-\KeywordTok{library}\NormalTok{(electBook)}
-\KeywordTok{library}\NormalTok{(tidyverse)}
-\KeywordTok{data}\NormalTok{(Irish)}
-\NormalTok{indCons \textless{}{-}}\StringTok{ }\NormalTok{Irish[[}\StringTok{"indCons"}\NormalTok{]]}
-\NormalTok{survey \textless{}{-}}\StringTok{ }\NormalTok{Irish[[}\StringTok{"survey"}\NormalTok{]]}
-\NormalTok{extra \textless{}{-}}\StringTok{ }\NormalTok{Irish[[}\StringTok{"extra"}\NormalTok{]]}
+\FunctionTok{library}\NormalTok{(electBook)}
+\FunctionTok{data}\NormalTok{(Irish)}
+\NormalTok{indCons }\OtherTok{\textless{}{-}}\NormalTok{ Irish[[}\StringTok{"indCons"}\NormalTok{]]}
+\NormalTok{survey }\OtherTok{\textless{}{-}}\NormalTok{ Irish[[}\StringTok{"survey"}\NormalTok{]]}
+\NormalTok{extra }\OtherTok{\textless{}{-}}\NormalTok{ Irish[[}\StringTok{"extra"}\NormalTok{]]}
 \end{Highlighting}
 \end{Shaded}
 
@@ -178,6 +183,13 @@ occupation of the head of household:
 \item
   F: farmers
 \end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Vector of social classes}
+\NormalTok{soc\_classes }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\FunctionTok{unique}\NormalTok{(survey[}\StringTok{"SOCIALCLASS"}\NormalTok{]))}\SpecialCharTok{$}\NormalTok{SOCIALCLASS}
+\end{Highlighting}
+\end{Shaded}
 
 ** Insert plot of demand patterns for different classes **
 
@@ -210,6 +222,15 @@ script}, and the resulting dataframes \texttt{df\_halfhr\_scaled},
 \href{https://github.com/Shermjj/SC-2-Electric-Boogalo/tree/main/data}{\texttt{data}
 folder}.
 
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Load transformed data for all time scales}
+\NormalTok{df\_halfhr\_scaled }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/df\_halfhr\_scaled.RData"}\NormalTok{))}
+\NormalTok{df\_hr\_scaled }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/df\_hr\_scaled.RData"}\NormalTok{))}
+\NormalTok{df\_day\_scaled }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/df\_day\_scaled.RData"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
 \hypertarget{time-related-features}{%
 \subsubsection{Time-related features}\label{time-related-features}}
 
@@ -226,18 +247,23 @@ demand over time across all households:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{agg \textless{}{-}}\StringTok{ }\KeywordTok{colMeans}\NormalTok{(indCons)}
+\FunctionTok{library}\NormalTok{(tidyverse)}
 
-\NormalTok{temp\_demand \textless{}{-}}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}\DataTypeTok{demand =}\NormalTok{ agg) }\OperatorTok{\%\textgreater{}\%}
-\StringTok{  }\KeywordTok{bind\_cols}\NormalTok{(Irish[[}\StringTok{"extra"}\NormalTok{]])}
+\CommentTok{\# Aggregate demand over all households}
+\NormalTok{agg }\OtherTok{\textless{}{-}} \FunctionTok{rowSums}\NormalTok{(indCons)}
+\CommentTok{\# Add temperature data}
+\NormalTok{temp\_demand }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{demand =}\NormalTok{ agg) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{bind\_cols}\NormalTok{(Irish[[}\StringTok{"extra"}\NormalTok{]])}
 
-\KeywordTok{ggplot}\NormalTok{(temp\_demand, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ dateTime, }\DataTypeTok{y =}\NormalTok{ demand, }\DataTypeTok{color =}\NormalTok{ temp)) }\OperatorTok{+}
-\StringTok{  }\KeywordTok{geom\_point}\NormalTok{() }\OperatorTok{+}
-\StringTok{  }\NormalTok{viridis}\OperatorTok{::}\KeywordTok{scale\_color\_viridis}\NormalTok{(}\DataTypeTok{option =} \StringTok{"magma"}\NormalTok{) }\OperatorTok{+}
-\StringTok{  }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{x =} \StringTok{"Date"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Total Demand"}\NormalTok{, }\DataTypeTok{color =} \StringTok{"Temperature"}\NormalTok{) }\OperatorTok{+}
-\StringTok{  }\KeywordTok{theme\_bw}\NormalTok{()}
+\FunctionTok{ggplot}\NormalTok{(temp\_demand, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime, }\AttributeTok{y =}\NormalTok{ demand, }\AttributeTok{color =}\NormalTok{ temp)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{() }\SpecialCharTok{+}
+\NormalTok{  viridis}\SpecialCharTok{::}\FunctionTok{scale\_color\_viridis}\NormalTok{(}\AttributeTok{option =} \StringTok{"magma"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Total Demand"}\NormalTok{, }\AttributeTok{color =} \StringTok{"Temperature"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_bw}\NormalTok{()}
 \end{Highlighting}
 \end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-4-1.pdf}
 
 We can see that during the warmer summer months, demand dips, although
 the pattern is messy. We included linear and quadratic terms for
@@ -266,10 +292,10 @@ variable increments by one for each time step (half hour, hour, or day)
 in the dataframe, reflecting the fact that some days are missing. These
 \texttt{counter} variables were then used later on to generate Fourier
 terms for our models. We wrote an \texttt{Rcpp} function in our package
-called \texttt{generate\_fourier\_terms}, which creates a matrix of
-Fourier terms given a time counter variable representing \(t\), the
-maximum order of the Fourier terms \(K\), and the number of time
-increments in a period \(P\).
+called \texttt{GenFT}, which creates a matrix of Fourier terms given a
+time counter variable representing \(t\), the maximum order of the
+Fourier terms \(K\), and the number of time increments in a period
+\(P\).
 
 \textbf{Insert example of \texttt{generate\_fourier\_terms} function}
 
@@ -284,6 +310,20 @@ We centered and scaled all variables used in the models.
 Because this is time series data, we needed to make sure the training
 and testing data were both contiguous. We trained the models on the
 first 90\% of the rows and tested on the final 10\%.
+
+\hypertarget{elecforecast-package}{%
+\section{\texorpdfstring{\texttt{ElecForecast}
+package}{ElecForecast package}}\label{elecforecast-package}}
+
+\textbf{Insert short description of package, what it does, how to
+install it}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Load our package}
+\FunctionTok{library}\NormalTok{(ElecForecast)}
+\end{Highlighting}
+\end{Shaded}
 
 \hypertarget{ridge-regression}{%
 \section{Ridge Regression}\label{ridge-regression}}
@@ -332,6 +372,9 @@ following input variables:
   Annual Fourier terms likewise
 \end{itemize}
 
+We predicted demand for each of the five social classes at all three
+time scales (half hour, hour, and day).
+
 We had two hyperparameters to tune: the standard ridge regression
 parameter \(\lambda\) and the maximum order of the Fourier terms
 included \(K\). For sake of simplicity, we elected to use the same \(K\)
@@ -340,13 +383,176 @@ value for both the daily and the annual terms.
 \hypertarget{implementation}{%
 \subsection{Implementation}\label{implementation}}
 
-We implemented ridge regression using \texttt{RcppArmadillo}. To select
-\(\lambda\), we used \(k\)-fold cross-validation, also implemented in
-\texttt{RcppArmadillo} using \texttt{RcppParallel} to parallelise the
-cross-validation process. These functions can be found in our package in
-the
-\href{https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast/src/ridge_regression.h}{\texttt{ridge\_regression.h}
-file}.
+We implemented ridge regression using \texttt{RcppArmadillo} in our
+function \texttt{RidgeReg}. We also wrote a function
+\texttt{RidgeRegPar} for ridge regression using \texttt{RcppParallel} to
+parallelise the matrix multiplication. We can compare the results of
+\texttt{RidgeRegPar} with those of the \texttt{glmnet} package:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# library(glmnet)}
+\CommentTok{\# }
+\CommentTok{\# \# Example data}
+\CommentTok{\# ex\_x \textless{}{-} matrix(rnorm(100 * 20), 100, 20)}
+\CommentTok{\# ex\_y \textless{}{-} rnorm(100)}
+\CommentTok{\# }
+\CommentTok{\# \# Fit ridge regression using glmnet}
+\CommentTok{\# fit\_glmnet \textless{}{-} cv.glmnet(ex\_x,}
+\CommentTok{\#                         ex\_y,}
+\CommentTok{\#                         family = "gaussian",}
+\CommentTok{\#                         alpha = 0,}
+\CommentTok{\#                         type.measure = "mse",}
+\CommentTok{\#                         nfolds = 10)}
+\CommentTok{\# ex\_pred\_glmnet \textless{}{-} predict(fit\_glmnet, newx = ex\_x)}
+\CommentTok{\# }
+\CommentTok{\# \# Fit ridge regression using RidgeRegPar}
+\CommentTok{\# fit\_RidgeRegPar \textless{}{-} RidgeRegPar(ex\_x,}
+\CommentTok{\#                                ex\_y, }
+\CommentTok{\#                                \# Use same lambda as glmnet for comparison}
+\CommentTok{\#                                lambda = fit\_glmnet$lambda.1se * nrow(ex\_x)}
+\CommentTok{\#                                )}
+\CommentTok{\# ex\_pred\_RidgeRegPar \textless{}{-} cbind(1, ex\_x) \%*\% fit\_RidgeRegPar$coefficients}
+\CommentTok{\# }
+\CommentTok{\# \# Compare predictions}
+\CommentTok{\# ex\_df \textless{}{-} data.frame(y = ex\_y,}
+\CommentTok{\#                     glmnet\_pred = ex\_pred\_glmnet,}
+\CommentTok{\#                     RidgeRegPar\_pred = ex\_pred\_RidgeRegPar)}
+\end{Highlighting}
+\end{Shaded}
+
+To select \(\lambda\) and \(K\), we used \(k\)-fold cross-validation to
+perform a grid search across all combinations of \(\lambda\) and \(K\).
+We implemented this cross-validation in the function
+\texttt{parallel\_ridge\_cross\_validation}.
+
+\hypertarget{results}{%
+\subsection{Results}\label{results}}
+
+\hypertarget{half-hour}{%
+\subsubsection{Half hour}\label{half-hour}}
+
+We first split the dataset into training and testing sets:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Split the data into training and test sets}
+\CommentTok{\# 90\% training set}
+\NormalTok{n\_train\_halfhr }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_halfhr\_scaled))}
+\CommentTok{\# Training and testing counter }
+\NormalTok{train\_counter\_halfhr }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr]}
+\NormalTok{test\_counter\_halfhr }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr)]}
+\CommentTok{\# Training and testing features}
+\NormalTok{halfhr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr,] }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
+\NormalTok{halfhr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr),] }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
+\end{Highlighting}
+\end{Shaded}
+
+Next, we perform 5-fold cross-validation to identify the \(\lambda\) and
+\(K\) values that minimize mean squared error. We did this for each of
+the five social classes.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Range of lambda values}
+\NormalTok{lambda\_values }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\FloatTok{0.01}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{length.out =} \DecValTok{10}\NormalTok{) }\SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(halfhr\_features\_train)}
+
+\CommentTok{\# lapply over social classes}
+\NormalTok{halfhr\_ridge\_results }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  y\_class }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_features\_train[[}\FunctionTok{as.character}\NormalTok{(class)]]}
+  \CommentTok{\# Perform cross{-}validation}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}} \FunctionTok{parallel\_ridge\_cross\_validation}\NormalTok{(}
+    \AttributeTok{x\_vars =} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_train[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_train)]), }
+    \AttributeTok{y\_var =}\NormalTok{ y\_class,}
+    \AttributeTok{time\_counter =}\NormalTok{ train\_counter\_halfhr, }
+    \AttributeTok{daily\_period =} \DecValTok{48}\NormalTok{,}
+    \AttributeTok{annual\_period =} \DecValTok{48} \SpecialCharTok{*} \DecValTok{365}\NormalTok{,}
+    \AttributeTok{max\_K =} \DecValTok{5}\NormalTok{,}
+    \AttributeTok{lambda\_values =}\NormalTok{ lambda\_values,}
+    \AttributeTok{n\_folds =} \DecValTok{10}
+\NormalTok{  )}
+  \FunctionTok{return}\NormalTok{(cv\_results)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(halfhr\_ridge\_results) }\OtherTok{\textless{}{-}}\NormalTok{ soc\_classes}
+
+\CommentTok{\# Get predictions for each model on the test set}
+\NormalTok{halfhr\_ridge\_preds }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(halfhr\_ridge\_results, }\ControlFlowTok{function}\NormalTok{(cv\_results) \{}
+\NormalTok{  preds }\OtherTok{\textless{}{-}} \FunctionTok{predict\_parallel\_ridge\_cv}\NormalTok{(}\AttributeTok{model =}\NormalTok{ cv\_results,}
+                                     \AttributeTok{x\_test =} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_test[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_test)]),}
+                                     \AttributeTok{time\_counter =}\NormalTok{ test\_counter\_halfhr,}
+                                     \AttributeTok{daily\_period =} \DecValTok{48}\NormalTok{,}
+                                     \AttributeTok{annual\_period =} \DecValTok{48} \SpecialCharTok{*} \DecValTok{365}\NormalTok{)}
+  \FunctionTok{return}\NormalTok{(preds)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(halfhr\_ridge\_preds) }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(soc\_classes, }\StringTok{"\_preds"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+We can now visualize the predictions on the testing set:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(patchwork)}
+\CommentTok{\# Dataframe of true values and predictions on test set}
+\NormalTok{halfhr\_test\_true\_preds }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_features\_test }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(dateTime, }\FunctionTok{all\_of}\NormalTok{(soc\_classes)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \CommentTok{\# Add predictions}
+  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(halfhr\_ridge\_preds))}
+
+\CommentTok{\# Plot the predictions for each social class}
+\CommentTok{\# Arrange in a grid}
+\NormalTok{halfhr\_ridge\_plots }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
+\ControlFlowTok{for}\NormalTok{ (class }\ControlFlowTok{in} \FunctionTok{as.character}\NormalTok{(soc\_classes)) \{}
+\NormalTok{  plot\_title }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"Half{-}hourly demand predictions for"}\NormalTok{, class)}
+\NormalTok{  p }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(halfhr\_test\_true\_preds, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime)) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[class]]), }\AttributeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[}\FunctionTok{paste0}\NormalTok{(class, }\StringTok{"\_preds"}\NormalTok{)]]), }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ plot\_title, }\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{theme\_bw}\NormalTok{()}
+\NormalTok{  halfhr\_ridge\_plots[[class]] }\OtherTok{\textless{}{-}}\NormalTok{ p}
+\NormalTok{\}}
+\NormalTok{combined\_halfhr\_ridge\_plot }\OtherTok{\textless{}{-}} \FunctionTok{wrap\_plots}\NormalTok{(halfhr\_ridge\_plots, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{)}
+\NormalTok{combined\_halfhr\_ridge\_plot}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-9-1.pdf}
+
+\hypertarget{hour}{%
+\subsubsection{Hour}\label{hour}}
+
+Split the dataset into training and testing sets:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Split the data into training and test sets}
+\CommentTok{\# 90\% training set}
+\NormalTok{n\_train\_hr }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_hr\_scaled))}
+\NormalTok{hr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr,]}
+\NormalTok{train\_counter\_hr }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr]}
+\NormalTok{hr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr),]}
+\NormalTok{test\_counter\_hr }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr)]}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{day}{%
+\subsubsection{Day}\label{day}}
+
+Split the dataset into training and testing sets:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Split the data into training and test sets}
+\CommentTok{\# 90\% training set}
+\NormalTok{n\_train\_day }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_day\_scaled))}
+\NormalTok{day\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day,]}
+\NormalTok{train\_counter\_day }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day]}
+\NormalTok{day\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day),]}
+\NormalTok{test\_counter\_day }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day)]}
+\end{Highlighting}
+\end{Shaded}
 
 \hypertarget{gaussian-process-regression}{%
 \section{Gaussian Process
@@ -428,47 +634,47 @@ which can also be found \texttt{gauss\_process\_reg.cpp}:
 \CommentTok{// [[Rcpp::depends(RcppArmadillo)]]}
 
 \CommentTok{// Define the RBF kernel}
-\NormalTok{arma::mat rbf\_kernel(}\AttributeTok{const}\NormalTok{ arma::mat\& X, }\DataTypeTok{double}\NormalTok{ l, }\DataTypeTok{double}\NormalTok{ sigma) \{}
-\NormalTok{    arma::mat K = arma::zeros(X.n\_rows, X.n\_rows);}
-    \ControlFlowTok{for}\NormalTok{ (}\DataTypeTok{unsigned}\NormalTok{ i = }\DecValTok{0}\NormalTok{; i \textless{} X.n\_rows; ++i) \{}
-        \ControlFlowTok{for}\NormalTok{ (}\DataTypeTok{unsigned}\NormalTok{ j = }\DecValTok{0}\NormalTok{; j \textless{} X.n\_rows; ++j) \{}
-            \DataTypeTok{double}\NormalTok{ dist = arma::norm(X.row(i) {-} X.row(j), }\DecValTok{2}\NormalTok{);}
-\NormalTok{            K(i, j) = }\BuiltInTok{std::}\NormalTok{pow(sigma, }\DecValTok{2}\NormalTok{) * }\BuiltInTok{std::}\NormalTok{exp({-}}\BuiltInTok{std::}\NormalTok{pow(dist, }\DecValTok{2}\NormalTok{) / (}\DecValTok{2}\NormalTok{ * }\BuiltInTok{std::}\NormalTok{pow(l, }\DecValTok{2}\NormalTok{)));}
-\NormalTok{        \}}
-\NormalTok{    \}}
-    \ControlFlowTok{return}\NormalTok{ K;}
-\NormalTok{\}}
+\NormalTok{arma}\OperatorTok{::}\NormalTok{mat rbf\_kernel}\OperatorTok{(}\AttributeTok{const}\NormalTok{ arma}\OperatorTok{::}\NormalTok{mat}\OperatorTok{\&}\NormalTok{ X}\OperatorTok{,} \DataTypeTok{double}\NormalTok{ l}\OperatorTok{,} \DataTypeTok{double}\NormalTok{ sigma}\OperatorTok{)} \OperatorTok{\{}
+\NormalTok{    arma}\OperatorTok{::}\NormalTok{mat K }\OperatorTok{=}\NormalTok{ arma}\OperatorTok{::}\NormalTok{zeros}\OperatorTok{(}\NormalTok{X}\OperatorTok{.}\NormalTok{n\_rows}\OperatorTok{,}\NormalTok{ X}\OperatorTok{.}\NormalTok{n\_rows}\OperatorTok{);}
+    \ControlFlowTok{for} \OperatorTok{(}\DataTypeTok{unsigned}\NormalTok{ i }\OperatorTok{=} \DecValTok{0}\OperatorTok{;}\NormalTok{ i }\OperatorTok{\textless{}}\NormalTok{ X}\OperatorTok{.}\NormalTok{n\_rows}\OperatorTok{;} \OperatorTok{++}\NormalTok{i}\OperatorTok{)} \OperatorTok{\{}
+        \ControlFlowTok{for} \OperatorTok{(}\DataTypeTok{unsigned}\NormalTok{ j }\OperatorTok{=} \DecValTok{0}\OperatorTok{;}\NormalTok{ j }\OperatorTok{\textless{}}\NormalTok{ X}\OperatorTok{.}\NormalTok{n\_rows}\OperatorTok{;} \OperatorTok{++}\NormalTok{j}\OperatorTok{)} \OperatorTok{\{}
+            \DataTypeTok{double}\NormalTok{ dist }\OperatorTok{=}\NormalTok{ arma}\OperatorTok{::}\NormalTok{norm}\OperatorTok{(}\NormalTok{X}\OperatorTok{.}\NormalTok{row}\OperatorTok{(}\NormalTok{i}\OperatorTok{)} \OperatorTok{{-}}\NormalTok{ X}\OperatorTok{.}\NormalTok{row}\OperatorTok{(}\NormalTok{j}\OperatorTok{),} \DecValTok{2}\OperatorTok{);}
+\NormalTok{            K}\OperatorTok{(}\NormalTok{i}\OperatorTok{,}\NormalTok{ j}\OperatorTok{)} \OperatorTok{=} \BuiltInTok{std::}\NormalTok{pow}\OperatorTok{(}\NormalTok{sigma}\OperatorTok{,} \DecValTok{2}\OperatorTok{)} \OperatorTok{*} \BuiltInTok{std::}\NormalTok{exp}\OperatorTok{({-}}\BuiltInTok{std::}\NormalTok{pow}\OperatorTok{(}\NormalTok{dist}\OperatorTok{,} \DecValTok{2}\OperatorTok{)} \OperatorTok{/} \OperatorTok{(}\DecValTok{2} \OperatorTok{*} \BuiltInTok{std::}\NormalTok{pow}\OperatorTok{(}\NormalTok{l}\OperatorTok{,} \DecValTok{2}\OperatorTok{)));}
+        \OperatorTok{\}}
+    \OperatorTok{\}}
+    \ControlFlowTok{return}\NormalTok{ K}\OperatorTok{;}
+\OperatorTok{\}}
 
 \CommentTok{// Define the negative log marginal likelihood}
-\DataTypeTok{double}\NormalTok{ neg\_log\_marginal\_likelihood(}\AttributeTok{const}\NormalTok{ arma::vec\& theta, arma::vec* grad\_out, }\DataTypeTok{void}\NormalTok{* opt\_data) \{}
+\DataTypeTok{double}\NormalTok{ neg\_log\_marginal\_likelihood}\OperatorTok{(}\AttributeTok{const}\NormalTok{ arma}\OperatorTok{::}\NormalTok{vec}\OperatorTok{\&}\NormalTok{ theta}\OperatorTok{,}\NormalTok{ arma}\OperatorTok{::}\NormalTok{vec}\OperatorTok{*}\NormalTok{ grad\_out}\OperatorTok{,} \DataTypeTok{void}\OperatorTok{*}\NormalTok{ opt\_data}\OperatorTok{)} \OperatorTok{\{}
     \CommentTok{// Extract data and parameters}
-\NormalTok{    arma::mat X = *}\KeywordTok{static\_cast}\NormalTok{\textless{}arma::mat*\textgreater{}(opt\_data);}
-\NormalTok{    arma::vec y = *}\KeywordTok{static\_cast}\NormalTok{\textless{}arma::vec*\textgreater{}(opt\_data);}
-    \DataTypeTok{double}\NormalTok{ l = theta(}\DecValTok{0}\NormalTok{);}
-    \DataTypeTok{double}\NormalTok{ sigma = theta(}\DecValTok{1}\NormalTok{);}
+\NormalTok{    arma}\OperatorTok{::}\NormalTok{mat X }\OperatorTok{=} \OperatorTok{*}\KeywordTok{static\_cast}\OperatorTok{\textless{}}\NormalTok{arma}\OperatorTok{::}\NormalTok{mat}\OperatorTok{*\textgreater{}(}\NormalTok{opt\_data}\OperatorTok{);}
+\NormalTok{    arma}\OperatorTok{::}\NormalTok{vec y }\OperatorTok{=} \OperatorTok{*}\KeywordTok{static\_cast}\OperatorTok{\textless{}}\NormalTok{arma}\OperatorTok{::}\NormalTok{vec}\OperatorTok{*\textgreater{}(}\NormalTok{opt\_data}\OperatorTok{);}
+    \DataTypeTok{double}\NormalTok{ l }\OperatorTok{=}\NormalTok{ theta}\OperatorTok{(}\DecValTok{0}\OperatorTok{);}
+    \DataTypeTok{double}\NormalTok{ sigma }\OperatorTok{=}\NormalTok{ theta}\OperatorTok{(}\DecValTok{1}\OperatorTok{);}
 
     \CommentTok{// Calculate the kernel matrix}
-\NormalTok{    arma::mat K = rbf\_kernel(X, l, sigma);}
+\NormalTok{    arma}\OperatorTok{::}\NormalTok{mat K }\OperatorTok{=}\NormalTok{ rbf\_kernel}\OperatorTok{(}\NormalTok{X}\OperatorTok{,}\NormalTok{ l}\OperatorTok{,}\NormalTok{ sigma}\OperatorTok{);}
 
     \CommentTok{// Calculate the log marginal likelihood}
     
-    \DataTypeTok{double}\NormalTok{ log\_likelihood = {-}}\FloatTok{0.5}\NormalTok{ * arma::as\_scalar(y.t() * arma::solve(K, y)) {-} }\FloatTok{0.5}\NormalTok{ * arma::log\_det(K + l ) {-} }\FloatTok{0.5}\NormalTok{ * X.n\_rows * }\BuiltInTok{std::}\NormalTok{log(}\DecValTok{2}\NormalTok{ * M\_PI);}
+    \DataTypeTok{double}\NormalTok{ log\_likelihood }\OperatorTok{=} \OperatorTok{{-}}\FloatTok{0.5} \OperatorTok{*}\NormalTok{ arma}\OperatorTok{::}\NormalTok{as\_scalar}\OperatorTok{(}\NormalTok{y}\OperatorTok{.}\NormalTok{t}\OperatorTok{()} \OperatorTok{*}\NormalTok{ arma}\OperatorTok{::}\NormalTok{solve}\OperatorTok{(}\NormalTok{K}\OperatorTok{,}\NormalTok{ y}\OperatorTok{))} \OperatorTok{{-}} \FloatTok{0.5} \OperatorTok{*}\NormalTok{ arma}\OperatorTok{::}\NormalTok{log\_det}\OperatorTok{(}\NormalTok{K }\OperatorTok{+}\NormalTok{ l }\OperatorTok{)} \OperatorTok{{-}} \FloatTok{0.5} \OperatorTok{*}\NormalTok{ X}\OperatorTok{.}\NormalTok{n\_rows }\OperatorTok{*} \BuiltInTok{std::}\NormalTok{log}\OperatorTok{(}\DecValTok{2} \OperatorTok{*}\NormalTok{ M\_PI}\OperatorTok{);}
 
     \CommentTok{// Return the negative log marginal likelihood}
-    \ControlFlowTok{return}\NormalTok{ {-}log\_likelihood;}
-\NormalTok{\}}
+    \ControlFlowTok{return} \OperatorTok{{-}}\NormalTok{log\_likelihood}\OperatorTok{;}
+\OperatorTok{\}}
 
 \CommentTok{// [[Rcpp::export]]}
-\NormalTok{arma::vec optimise\_gaussian\_process(arma::mat X, arma::vec y) \{}
+\NormalTok{arma}\OperatorTok{::}\NormalTok{vec optimise\_gaussian\_process}\OperatorTok{(}\NormalTok{arma}\OperatorTok{::}\NormalTok{mat X}\OperatorTok{,}\NormalTok{ arma}\OperatorTok{::}\NormalTok{vec y}\OperatorTok{)} \OperatorTok{\{}
     \CommentTok{// Initial guess for the parameters}
-\NormalTok{    arma::vec theta = arma::ones(}\DecValTok{2}\NormalTok{);}
+\NormalTok{    arma}\OperatorTok{::}\NormalTok{vec theta }\OperatorTok{=}\NormalTok{ arma}\OperatorTok{::}\NormalTok{ones}\OperatorTok{(}\DecValTok{2}\OperatorTok{);}
 
     \CommentTok{// Optimise the negative log marginal likelihood}
-    \DataTypeTok{bool}\NormalTok{ success = optim::de(theta, neg\_log\_marginal\_likelihood, \&X);}
+    \DataTypeTok{bool}\NormalTok{ success }\OperatorTok{=}\NormalTok{ optim}\OperatorTok{::}\NormalTok{de}\OperatorTok{(}\NormalTok{theta}\OperatorTok{,}\NormalTok{ neg\_log\_marginal\_likelihood}\OperatorTok{,} \OperatorTok{\&}\NormalTok{X}\OperatorTok{);}
 
     \CommentTok{// Return the optimised parameters}
-    \ControlFlowTok{return}\NormalTok{ theta;}
-\NormalTok{\}}
+    \ControlFlowTok{return}\NormalTok{ theta}\OperatorTok{;}
+\OperatorTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -481,15 +687,15 @@ but it can be found in \texttt{gauss\_process\_reg.R}:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{find\_optimal\_params \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(X, y) \{}
+\NormalTok{find\_optimal\_params }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(X, y) \{}
   \CommentTok{\# Source the C++ file}
-  \KeywordTok{sourceCpp}\NormalTok{(}\StringTok{"gauss\_process\_reg.cpp"}\NormalTok{)}
+  \FunctionTok{sourceCpp}\NormalTok{(}\StringTok{"gauss\_process\_reg.cpp"}\NormalTok{)}
   
   \CommentTok{\# Call the C++ function}
-\NormalTok{  theta \textless{}{-}}\StringTok{ }\KeywordTok{optimise\_gaussian\_process}\NormalTok{(X, y)}
+\NormalTok{  theta }\OtherTok{\textless{}{-}} \FunctionTok{optimise\_gaussian\_process}\NormalTok{(X, y)}
   
   \CommentTok{\# Return the optimal parameters}
-  \KeywordTok{return}\NormalTok{(theta)}
+  \FunctionTok{return}\NormalTok{(theta)}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -507,54 +713,54 @@ found in \texttt{gauss\_process\_reg.R}:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{gaussian\_process\_reg \textless{}{-}}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data,}
-                                 \DataTypeTok{class =} \StringTok{"DE"}\NormalTok{,}
-                                 \DataTypeTok{kernel =} \StringTok{"rbfdot"}\NormalTok{,}
-                                 \DataTypeTok{plot =} \OtherTok{FALSE}\NormalTok{,}
-                                 \DataTypeTok{sigma =} \DecValTok{100}\NormalTok{) \{}
+\NormalTok{gaussian\_process\_reg }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(data,}
+                                 \AttributeTok{class =} \StringTok{"DE"}\NormalTok{,}
+                                 \AttributeTok{kernel =} \StringTok{"rbfdot"}\NormalTok{,}
+                                 \AttributeTok{plot =} \ConstantTok{FALSE}\NormalTok{,}
+                                 \AttributeTok{sigma =} \DecValTok{100}\NormalTok{) \{}
 
   \CommentTok{\#Training and test set, first 90\% of data is training, last 10\% is test}
-\NormalTok{  train\_index \textless{}{-}}\StringTok{ }\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(data) }\OperatorTok{*}\StringTok{ }\FloatTok{0.9}\NormalTok{)}
-\NormalTok{  train\_set \textless{}{-}}\StringTok{ }\NormalTok{data[}\DecValTok{1}\OperatorTok{:}\NormalTok{train\_index, ]}
-\NormalTok{  test\_set \textless{}{-}}\StringTok{ }\NormalTok{data[(train\_index }\OperatorTok{+}\StringTok{ }\DecValTok{1}\NormalTok{)}\OperatorTok{:}\KeywordTok{nrow}\NormalTok{(data), ]}
+\NormalTok{  train\_index }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FunctionTok{nrow}\NormalTok{(data) }\SpecialCharTok{*} \FloatTok{0.9}\NormalTok{)}
+\NormalTok{  train\_set }\OtherTok{\textless{}{-}}\NormalTok{ data[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{train\_index, ]}
+\NormalTok{  test\_set }\OtherTok{\textless{}{-}}\NormalTok{ data[(train\_index }\SpecialCharTok{+} \DecValTok{1}\NormalTok{)}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(data), ]}
 
   \CommentTok{\# Define the Gaussian process model}
-\NormalTok{  gpr\_model \textless{}{-}}\StringTok{ }\NormalTok{kernlab}\OperatorTok{::}\KeywordTok{gausspr}\NormalTok{(}\KeywordTok{as.matrix}\NormalTok{(train\_set[, }\KeywordTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
-                                \KeywordTok{as.vector}\NormalTok{(train\_set[[class]]),}
-                                \DataTypeTok{kernel =}\NormalTok{ kernel, }\DataTypeTok{kpar =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{sigma =}\NormalTok{ sigma))}
+\NormalTok{  gpr\_model }\OtherTok{\textless{}{-}}\NormalTok{ kernlab}\SpecialCharTok{::}\FunctionTok{gausspr}\NormalTok{(}\FunctionTok{as.matrix}\NormalTok{(train\_set[, }\FunctionTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
+                                \FunctionTok{as.vector}\NormalTok{(train\_set[[class]]),}
+                                \AttributeTok{kernel =}\NormalTok{ kernel, }\AttributeTok{kpar =} \FunctionTok{list}\NormalTok{(}\AttributeTok{sigma =}\NormalTok{ sigma))}
 
   \CommentTok{\# Predict the mean function for plotting}
-\NormalTok{  mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(data}\OperatorTok{$}\NormalTok{toy))}
-\NormalTok{  prediction \textless{}{-}}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}
-                           \DataTypeTok{toy =}\NormalTok{ data}\OperatorTok{$}\NormalTok{toy,}
-                           \DataTypeTok{mean =}\NormalTok{ mean\_func)}
+\NormalTok{  mean\_func }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(gpr\_model, }\FunctionTok{as.vector}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{toy))}
+\NormalTok{  prediction }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+                           \AttributeTok{toy =}\NormalTok{ data}\SpecialCharTok{$}\NormalTok{toy,}
+                           \AttributeTok{mean =}\NormalTok{ mean\_func)}
 
-\NormalTok{  data\_with\_pred \textless{}{-}}\StringTok{ }\KeywordTok{left\_join}\NormalTok{(data, prediction, }\DataTypeTok{by =} \StringTok{"toy"}\NormalTok{)}
+\NormalTok{  data\_with\_pred }\OtherTok{\textless{}{-}} \FunctionTok{left\_join}\NormalTok{(data, prediction, }\AttributeTok{by =} \StringTok{"toy"}\NormalTok{)}
 
   \CommentTok{\# Evaluate performance}
-\NormalTok{  test\_mean\_func \textless{}{-}}\StringTok{ }\KeywordTok{predict}\NormalTok{(gpr\_model, }\KeywordTok{as.vector}\NormalTok{(test\_set}\OperatorTok{$}\NormalTok{toy))}
-\NormalTok{  performance \textless{}{-}}\StringTok{ }\KeywordTok{postResample}\NormalTok{(}\DataTypeTok{pred =}\NormalTok{ test\_mean\_func, }\DataTypeTok{obs =}\NormalTok{ test\_set}\OperatorTok{$}\NormalTok{DE)}
+\NormalTok{  test\_mean\_func }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(gpr\_model, }\FunctionTok{as.vector}\NormalTok{(test\_set}\SpecialCharTok{$}\NormalTok{toy))}
+\NormalTok{  performance }\OtherTok{\textless{}{-}} \FunctionTok{postResample}\NormalTok{(}\AttributeTok{pred =}\NormalTok{ test\_mean\_func, }\AttributeTok{obs =}\NormalTok{ test\_set}\SpecialCharTok{$}\NormalTok{DE)}
 
   \CommentTok{\# Include Plots ?}
   \ControlFlowTok{if}\NormalTok{ (plot)\{}
-\NormalTok{    pl \textless{}{-}}\StringTok{ }\KeywordTok{ggplot}\NormalTok{(data\_with\_pred, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ toy)) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{geom\_point}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =} \KeywordTok{get}\NormalTok{(class)), }\DataTypeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{geom\_line}\NormalTok{(}\KeywordTok{aes}\NormalTok{(}\DataTypeTok{y =}\NormalTok{ mean), }\DataTypeTok{color =}\NormalTok{ class\_colours[class]) }\OperatorTok{+}
-\StringTok{      }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{title =} \StringTok{"GPR model predictions"}\NormalTok{,}
-           \DataTypeTok{x =} \StringTok{"Date"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Demand"}\NormalTok{)}
+\NormalTok{    pl }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(data\_with\_pred, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ toy)) }\SpecialCharTok{+}
+      \FunctionTok{geom\_point}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =} \FunctionTok{get}\NormalTok{(class)), }\AttributeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\SpecialCharTok{+}
+      \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ mean), }\AttributeTok{color =}\NormalTok{ class\_colours[class]) }\SpecialCharTok{+}
+      \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =} \StringTok{"GPR model predictions"}\NormalTok{,}
+           \AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{)}
 \NormalTok{    pl}
 \NormalTok{  \} }\ControlFlowTok{else}\NormalTok{ \{}
-\NormalTok{    pl \textless{}{-}}\StringTok{ }\OtherTok{NULL}
+\NormalTok{    pl }\OtherTok{\textless{}{-}} \ConstantTok{NULL}
 \NormalTok{  \}}
-  \KeywordTok{return}\NormalTok{(}\KeywordTok{list}\NormalTok{(}\DataTypeTok{model =}\NormalTok{ gpr\_model,}
-\NormalTok{              data \textless{}{-}}\StringTok{ }\NormalTok{data\_with\_pred,}
+  \FunctionTok{return}\NormalTok{(}\FunctionTok{list}\NormalTok{(}\AttributeTok{model =}\NormalTok{ gpr\_model,}
+\NormalTok{              data }\OtherTok{\textless{}{-}}\NormalTok{ data\_with\_pred,}
 \NormalTok{              performance,}
-              \DataTypeTok{plot =}\NormalTok{ pl))}
+              \AttributeTok{plot =}\NormalTok{ pl))}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
-\hypertarget{results}{%
-\section{Results}\label{results}}
+\hypertarget{results-1}{%
+\section{Results}\label{results-1}}
 
 \end{document}

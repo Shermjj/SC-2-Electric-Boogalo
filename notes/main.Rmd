@@ -27,7 +27,6 @@ We are analyzing a set of Irish household electricity demand available from the 
 ```{r message = FALSE}
 # Extract individual dataframes
 library(electBook)
-library(tidyverse)
 data(Irish)
 indCons <- Irish[["indCons"]]
 survey <- Irish[["survey"]]
@@ -44,6 +43,11 @@ We wanted to investigate demand patterns across different social classes. The da
 + DE: semi-skilled and unskilled manual workers, state pensioners, casual workers
 + F: farmers
 
+```{r}
+# Vector of social classes
+soc_classes <- c(unique(survey["SOCIALCLASS"]))$SOCIALCLASS
+```
+
 ** Insert plot of demand patterns for different classes **
 
 We modeled the average demand for each social class separately.
@@ -56,6 +60,14 @@ We cleaned the data using the code available in [`data_cleaning.R`](https://gith
 
 Based on exploratory data analysis, we created some features from the dataset to model demand. Feature engineering (with the exception of the addition of the Fourier terms) was performed in the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), and the resulting dataframes `df_halfhr_scaled`, `df_hr_scaled`, and `df_day_scaled` were saved to the [`data` folder](https://github.com/Shermjj/SC-2-Electric-Boogalo/tree/main/data).
 
+```{r}
+# Load transformed data for all time scales
+df_halfhr_scaled <- readRDS(here::here("data/df_halfhr_scaled.RData"))
+df_hr_scaled <- readRDS(here::here("data/df_hr_scaled.RData"))
+df_day_scaled <- readRDS(here::here("data/df_day_scaled.RData"))
+```
+
+
 ### Time-related features
 
 We extracted the hour of the day and the month from the date-time variable. We also included a quadratic term for temperature to capture the non-linear relationship between temperature and demand. We also used one-hot encoding to include the day of the week in our models.
@@ -64,10 +76,12 @@ We extracted the hour of the day and the month from the date-time variable. We a
 
 We can visualize the relationship between temperature and the aggregate demand over time across all households:
 
-```{r,eval = FALSE}
+```{r message=FALSE}
+library(tidyverse)
 
-agg <- colMeans(indCons)
-
+# Aggregate demand over all households
+agg <- rowSums(indCons)
+# Add temperature data
 temp_demand <- data.frame(demand = agg) %>%
   bind_cols(Irish[["extra"]])
 
@@ -86,7 +100,7 @@ We used Fourier terms to capture the patterns of seasonality in the data. Fourie
 where $k$ is the frequency and $t$ is the time. Then a partial Fourier sum can be written as $$ y(t) = \beta_0 + \sum_{k=1}^{K} \left( \beta_{1k} \sin\left(\frac{2\pi kt}{P}\right) + \beta_{2k} \cos\left(\frac{2\pi kt}{P}\right) \right) $$
 where $K$ is the maximum order of Fourier terms to use.
 
-We used Fourier terms to model the daily and annual seasonality in the data. Since our dataset is missing data for some days, we needed to adjust the $t$ used to calculate the Fourier terms to account for these gaps. In the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), we added the variable `counter` to all dataframes. This variable increments by one for each time step (half hour, hour, or day) in the dataframe, reflecting the fact that some days are missing. These `counter` variables were then used later on to generate Fourier terms for our models. We wrote an `Rcpp` function in our package called `generate_fourier_terms`, which creates a matrix of Fourier terms given a time counter variable representing $t$, the maximum order of the Fourier terms $K$, and the number of time increments in a period $P$.
+We used Fourier terms to model the daily and annual seasonality in the data. Since our dataset is missing data for some days, we needed to adjust the $t$ used to calculate the Fourier terms to account for these gaps. In the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), we added the variable `counter` to all dataframes. This variable increments by one for each time step (half hour, hour, or day) in the dataframe, reflecting the fact that some days are missing. These `counter` variables were then used later on to generate Fourier terms for our models. We wrote an `Rcpp` function in our package called `GenFT`, which creates a matrix of Fourier terms given a time counter variable representing $t$, the maximum order of the Fourier terms $K$, and the number of time increments in a period $P$.
 
 **Insert example of `generate_fourier_terms` function**
 
@@ -98,6 +112,14 @@ We centered and scaled all variables used in the models.
 
 Because this is time series data, we needed to make sure the training and testing data were both contiguous. We trained the models on the first 90% of the rows and tested on the final 10%.
 
+# `ElecForecast` package
+
+**Insert short description of package, what it does, how to install it**
+
+```{r}
+# Load our package
+library(ElecForecast)
+```
 
 # Ridge Regression
 
@@ -120,11 +142,272 @@ We performed ridge regression using the model detailed above, with the following
 + Daily Fourier terms $\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$ for $k \in \{1,...,K\}$
 + Annual Fourier terms likewise
 
+We predicted demand for each of the five social classes at all three time scales (half hour, hour, and day).
+
 We had two hyperparameters to tune: the standard ridge regression parameter $\lambda$ and the maximum order of the Fourier terms included $K$. For sake of simplicity, we elected to use the same $K$ value for both the daily and the annual terms.
 
 ## Implementation
 
-We implemented ridge regression using `RcppArmadillo`. To select $\lambda$, we used $k$-fold cross-validation, also implemented in `RcppArmadillo` using `RcppParallel` to parallelise the cross-validation process. These functions can be found in our package in the [`ridge_regression.h` file](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast/src/ridge_regression.h).
+We implemented ridge regression using `RcppArmadillo` in our function `RidgeReg`. We also wrote a function `RidgeRegPar` for ridge regression using `RcppParallel` to parallelise the matrix multiplication. We can compare the results of `RidgeRegPar` with those of the `glmnet` package:
+
+```{r}
+# library(glmnet)
+# 
+# # Example data
+# ex_x <- matrix(rnorm(100 * 20), 100, 20)
+# ex_y <- rnorm(100)
+# 
+# # Fit ridge regression using glmnet
+# fit_glmnet <- cv.glmnet(ex_x,
+#                         ex_y,
+#                         family = "gaussian",
+#                         alpha = 0,
+#                         type.measure = "mse",
+#                         nfolds = 10)
+# ex_pred_glmnet <- predict(fit_glmnet, newx = ex_x)
+# 
+# # Fit ridge regression using RidgeRegPar
+# fit_RidgeRegPar <- RidgeRegPar(ex_x,
+#                                ex_y, 
+#                                # Use same lambda as glmnet for comparison
+#                                lambda = fit_glmnet$lambda.1se * nrow(ex_x)
+#                                )
+# ex_pred_RidgeRegPar <- cbind(1, ex_x) %*% fit_RidgeRegPar$coefficients
+# 
+# # Compare predictions
+# ex_df <- data.frame(y = ex_y,
+#                     glmnet_pred = ex_pred_glmnet,
+#                     RidgeRegPar_pred = ex_pred_RidgeRegPar)
+
+```
+
+To select $\lambda$ and $K$, we used $k$-fold cross-validation to perform a grid search across all combinations of $\lambda$ and $K$. We implemented this cross-validation in the function `parallel_ridge_cross_validation`.
+
+## Results
+
+### Half hour
+
+We first split the dataset into training and testing sets:
+
+```{r}
+# Split the data into training and test sets
+# 90% training set
+n_train_halfhr <- round(0.9*nrow(df_halfhr_scaled))
+# Training and testing counter 
+train_counter_halfhr <- df_halfhr_scaled$counter[1:n_train_halfhr]
+test_counter_halfhr <- df_halfhr_scaled$counter[-(1:n_train_halfhr)]
+# Training and testing features
+halfhr_features_train <- df_halfhr_scaled[1:n_train_halfhr,] %>% 
+  select(-counter)
+halfhr_features_test <- df_halfhr_scaled[-(1:n_train_halfhr),] %>% 
+  select(-counter)
+```
+
+Next, we perform 5-fold cross-validation to identify the $\lambda$ and $K$ values that minimize mean squared error. We did this for each of the five social classes.
+
+```{r}
+# Range of lambda values
+lambda_values <- seq(0.01, 1, length.out = 10) * nrow(halfhr_features_train)
+
+# lapply over social classes
+halfhr_ridge_results <- lapply(soc_classes, function(class) {
+  y_class <- halfhr_features_train[[as.character(class)]]
+  # Perform cross-validation
+  cv_results <- parallel_ridge_cross_validation(
+    x_vars = as.matrix(halfhr_features_train[,7:ncol(halfhr_features_train)]), 
+    y_var = y_class,
+    time_counter = train_counter_halfhr, 
+    daily_period = 48,
+    annual_period = 48 * 365,
+    max_K = 5,
+    lambda_values = lambda_values,
+    n_folds = 10
+  )
+  return(cv_results)
+})
+names(halfhr_ridge_results) <- soc_classes
+
+# Get predictions for each model on the test set
+halfhr_ridge_preds <- lapply(halfhr_ridge_results, function(cv_results) {
+  preds <- predict_parallel_ridge_cv(model = cv_results,
+                                     x_test = as.matrix(halfhr_features_test[,7:ncol(halfhr_features_test)]),
+                                     time_counter = test_counter_halfhr,
+                                     daily_period = 48,
+                                     annual_period = 48 * 365)
+  return(preds)
+})
+names(halfhr_ridge_preds) <- paste0(soc_classes, "_preds")
+```
+
+We can now visualize the predictions on the testing set:
+
+```{r}
+library(gridExtra)
+# Dataframe of true values and predictions on test set
+halfhr_test_true_preds <- halfhr_features_test %>% 
+  select(dateTime, all_of(soc_classes)) %>% 
+  # Add predictions
+  bind_cols(as.data.frame(halfhr_ridge_preds))
+
+# Plot the predictions for each social class
+# Arrange in a grid
+halfhr_ridge_plots <- list()
+for (class in as.character(soc_classes)) {
+  plot_title <- paste("Half-hourly demand predictions for", class)
+  p <- ggplot(halfhr_test_true_preds, aes(x = dateTime)) +
+    geom_line(aes(y = .data[[class]]), color = "#414141") +
+    geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
+    labs(title = plot_title, x = "Date", y = "Demand") +
+    theme_bw()
+  halfhr_ridge_plots[[class]] <- p
+}
+
+do.call(grid.arrange, c(halfhr_ridge_plots, ncol = 2))
+```
+
+### Hour
+
+Split the dataset into training and testing sets:
+
+```{r}
+# Split the data into training and test sets
+# 90% training set
+n_train_hr <- round(0.9*nrow(df_hr_scaled))
+hr_features_train <- df_hr_scaled[1:n_train_hr,]
+train_counter_hr <- df_hr_scaled$counter[1:n_train_hr]
+hr_features_test <- df_hr_scaled[-(1:n_train_hr),]
+test_counter_hr <- df_hr_scaled$counter[-(1:n_train_hr)]
+```
+
+Perform cross-validation:
+
+```{r}
+# lapply over social classes
+hr_ridge_results <- lapply(soc_classes, function(class) {
+  y_class <- hr_features_train[[as.character(class)]]
+  # Perform cross-validation
+  cv_results <- parallel_ridge_cross_validation(
+    x_vars = as.matrix(hr_features_train[,7:ncol(hr_features_train)]), 
+    y_var = y_class,
+    time_counter = train_counter_hr, 
+    daily_period = 48,
+    annual_period = 48 * 365,
+    max_K = 5,
+    lambda_values = lambda_values,
+    n_folds = 10
+  )
+  return(cv_results)
+})
+names(hr_ridge_results) <- soc_classes
+
+# Get predictions for each model on the test set
+hr_ridge_preds <- lapply(hr_ridge_results, function(cv_results) {
+  preds <- predict_parallel_ridge_cv(model = cv_results,
+                                     x_test = as.matrix(hr_features_test[,7:ncol(hr_features_test)]),
+                                     time_counter = test_counter_hr,
+                                     daily_period = 48,
+                                     annual_period = 48 * 365)
+  return(preds)
+})
+names(hr_ridge_preds) <- paste0(soc_classes, "_preds")
+```
+
+Visualize the predictions on the testing set:
+
+```{r}
+# Dataframe of true values and predictions on test set
+hr_test_true_preds <- hr_features_test %>% 
+  select(dateTime, all_of(soc_classes)) %>% 
+  # Add predictions
+  bind_cols(as.data.frame(hr_ridge_preds))
+
+# Plot the predictions for each social class
+# Arrange in a grid
+hr_ridge_plots <- list()
+for (class in as.character(soc_classes)) {
+  plot_title <- paste("Half-hourly demand predictions for", class)
+  p <- ggplot(hr_test_true_preds, aes(x = dateTime)) +
+    geom_line(aes(y = .data[[class]]), color = "#414141") +
+    geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
+    labs(title = plot_title, x = "Date", y = "Demand") +
+    theme_bw()
+  hr_ridge_plots[[class]] <- p
+}
+
+do.call(grid.arrange, c(hr_ridge_plots, ncol = 2))
+```
+
+### Day
+
+Split the dataset into training and testing sets:
+
+```{r}
+# Split the data into training and test sets
+# 90% training set
+n_train_day <- round(0.9*nrow(df_day_scaled))
+day_features_train <- df_day_scaled[1:n_train_day,]
+train_counter_day <- df_day_scaled$counter[1:n_train_day]
+day_features_test <- df_day_scaled[-(1:n_train_day),]
+test_counter_day <- df_day_scaled$counter[-(1:n_train_day)]
+```
+
+Perform cross-validation:
+
+```{r}
+# lapply over social classes
+day_ridge_results <- lapply(soc_classes, function(class) {
+  y_class <- day_features_train[[as.character(class)]]
+  # Perform cross-validation
+  cv_results <- parallel_ridge_cross_validation(
+    x_vars = as.matrix(day_features_train[,7:ncol(day_features_train)]), 
+    y_var = y_class,
+    time_counter = train_counter_day, 
+    daily_period = 48,
+    annual_period = 48 * 365,
+    max_K = 5,
+    lambda_values = lambda_values,
+    n_folds = 10
+  )
+  return(cv_results)
+})
+names(day_ridge_results) <- soc_classes
+
+# Get predictions for each model on the test set
+day_ridge_preds <- lapply(day_ridge_results, function(cv_results) {
+  preds <- predict_parallel_ridge_cv(model = cv_results,
+                                     x_test = as.matrix(day_features_test[,7:ncol(day_features_test)]),
+                                     time_counter = test_counter_day,
+                                     daily_period = 48,
+                                     annual_period = 48 * 365)
+  return(preds)
+})
+names(day_ridge_preds) <- paste0(soc_classes, "_preds")
+```
+
+Visualize the predictions on the testing set:
+
+```{r}
+# Dataframe of true values and predictions on test set
+day_test_true_preds <- day_features_test %>% 
+  select(dateTime, all_of(soc_classes)) %>% 
+  # Add predictions
+  bind_cols(as.data.frame(day_ridge_preds))
+
+# Plot the predictions for each social class
+# Arrange in a grid
+day_ridge_plots <- list()
+for (class in as.character(soc_classes)) {
+  plot_title <- paste("Half-hourly demand predictions for", class)
+  p <- ggplot(day_test_true_preds, aes(x = dateTime)) +
+    geom_line(aes(y = .data[[class]]), color = "#414141") +
+    geom_line(aes(y = .data[[paste0(class, "_preds")]]), color = "red") +
+    labs(title = plot_title, x = "Date", y = "Demand") +
+    theme_bw()
+  day_ridge_plots[[class]] <- p
+}
+
+do.call(grid.arrange, c(day_ridge_plots, ncol = 2))
+```
 
 # Gaussian Process Regression
 
