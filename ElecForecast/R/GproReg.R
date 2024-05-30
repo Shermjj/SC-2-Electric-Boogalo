@@ -42,7 +42,7 @@ gaussian_process_reg <- function(data,
                                  class = "DE",
                                  kernel = "rbfdot",
                                  plot = FALSE,
-                                 sigma = 100) {
+                                 sigma = 1000) {
   
   #Training and test set, first 90% of data is training, last 10% is test
   train_index <- round(nrow(data) * 0.9)
@@ -50,35 +50,35 @@ gaussian_process_reg <- function(data,
   test_set <- data[(train_index + 1):nrow(data), ]
   
   # Define the Gaussian process model
-  gpr_model <- kernlab::gausspr(as.matrix(train_set[,c("toy","temp")]),
+  gpr_model <- kernlab::gausspr(as.vector(train_set$counter),
                                 as.vector(train_set[[class]]),
-                                kernel = kernel, kpar = list(sigma = sigma))
+                                kernel = kernel,
+                                kpar = list(sigma = sigma))
   
   # Predict the mean function for plotting
-  mean_func <- predict(gpr_model, as.vector(data$toy))
+  mean_func <- predict(gpr_model, as.vector(data$counter))
   prediction <- data.frame(
-    toy = data$toy,
+    counter = data$counter,
     mean = mean_func)
   
-  data_with_pred <- left_join(data, prediction, by = "toy")
+  data_with_pred <- left_join(data, prediction, by = "counter")
   
   # Evaluate performance
-  test_mean_func <- predict(gpr_model, as.vector(test_set$toy))
+  test_mean_func <- predict(gpr_model, as.vector(test_set$counter))
   performance <- postResample(pred = test_mean_func, obs = test_set$DE)
   
   # Include Plots ?
   if (plot){
-    pl <- ggplot(data_with_pred, aes(x = toy)) +
-      geom_point(aes(y = get(class)), color = "#414141") +
+    pl <- ggplot(data_with_pred, aes(x = counter)) +
+      geom_point(aes(y = get(class)), color = "#5a5a5a", size = 0.2) +
       geom_line(aes(y = mean), color = class_colours[class]) +
-      labs(title = "GPR model predictions",
+      labs(title = paste("GPR model predictions for class", class),
            x = "Date", y = "Demand")
-    pl
   } else {
     pl <- NULL
   }
   return(list(model = gpr_model,
-              data <- data_with_pred,
+              data = data_with_pred,
               performance,
               plot = pl))
-}
+  }
