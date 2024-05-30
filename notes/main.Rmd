@@ -2,6 +2,7 @@
 title: "SC-2 Electric Boogalo"
 subtitle: "Regression on the Irish datset agregated by class"
 author: "Kieran Morris, Cecina Babich Morrow and Sherman Kjo"
+urlcolor: blue
 output:
     pdf_document:
         toc: true
@@ -27,6 +28,7 @@ We are analyzing a set of Irish household electricity demand available from the 
 ```{r message = FALSE}
 # Extract individual dataframes
 library(electBook)
+library(tidyverse)
 data(Irish)
 indCons <- Irish[["indCons"]]
 survey <- Irish[["survey"]]
@@ -46,11 +48,30 @@ We wanted to investigate demand patterns across different social classes. The da
 ```{r}
 # Vector of social classes
 soc_classes <- c(unique(survey["SOCIALCLASS"]))$SOCIALCLASS
+
+# Number of households per class
+survey %>% 
+  group_by(SOCIALCLASS) %>%
+  summarise(n_households = n()) %>% 
+  kableExtra::kable(col.names = c("Social Class", "Number of Households"))
 ```
 
-** Insert plot of demand patterns for different classes **
+We can look at the average daily demand for each social class to see the differences in patterns between classes:
 
-We modeled the average demand for each social class separately.
+```{r}
+df_day <- readRDS(here::here("data/df_day.RData"))
+
+# Plot average daily demand for each social class
+df_day %>%
+  mutate(dateTime = as.POSIXct(rownames(df_day))) %>% 
+  pivot_longer(cols = all_of(soc_classes), names_to = "class", values_to = "demand") %>%
+  ggplot(aes(x = dateTime, y = demand, color = class)) +
+  geom_line() +
+  labs(x = "Date", y = "Demand", color = "Social Class") +
+  theme_bw()
+```
+
+Because of these class-specific differences, we modeled the average demand for each social class separately.
 
 ## Loading and Structure
 
@@ -70,21 +91,26 @@ df_day_scaled <- readRDS(here::here("data/df_day_scaled.RData"))
 
 ### Time-related features
 
-We extracted the hour of the day and the month from the date-time variable. We also included a quadratic term for temperature to capture the non-linear relationship between temperature and demand. We also used one-hot encoding to include the day of the week in our models.
+We extracted the hour of the day and the month from the date-time variable. For the dataset at daily resolution, we did not use hour of the day. We also used one-hot encoding to include the day of the week in our models.
 
 ### Temperature
 
 We can visualize the relationship between temperature and the aggregate demand over time across all households:
 
 ```{r message=FALSE}
-library(tidyverse)
-
 # Aggregate demand over all households
 agg <- rowSums(indCons)
 # Add temperature data
 temp_demand <- data.frame(demand = agg) %>%
   bind_cols(Irish[["extra"]])
 
+# Demand vs. temperature
+ggplot(temp_demand, aes(x = temp, y = demand)) +
+  geom_point() +
+  labs(x = "Temperature", y = "Total Demand") +
+  theme_bw()
+
+# Demand over time colored by temperature
 ggplot(temp_demand, aes(x = dateTime, y = demand, color = temp)) +
   geom_point() +
   viridis::scale_color_viridis(option = "magma") +
@@ -92,17 +118,30 @@ ggplot(temp_demand, aes(x = dateTime, y = demand, color = temp)) +
   theme_bw()
 ```
 
-We can see that during the warmer summer months, demand dips, although the pattern is messy. We included linear and quadratic terms for temperature in our models.
+We can see that during the warmer summer months, demand dips, although the pattern is messy. We included linear and quadratic terms for temperature in our models to capture the non-linear relationship between temperature and demand.
 
 ### Fourier terms
+
+We found evidence for daily and annual seasonality patterns in our data. The temperature plot above shows the annual pattern of high energy usage in winter months, with a dip in the summer months. To see the pattern of daily fluctuations, we can view total demand by hour of the day:
+
+```{r}
+# Plot demand for each hour 
+agg_hour <- data.frame(total_demand = agg) %>% 
+  bind_cols(select(extra, dateTime)) %>% 
+  mutate(hour = hour(dateTime))
+ggplot(agg_hour, aes(x = hour, y = total_demand)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Hour", y = "Total Demand") +
+  theme_bw()
+```
+
 
 We used Fourier terms to capture the patterns of seasonality in the data. Fourier terms are a set of sine and cosine functions with different frequencies that can be used to model periodic patterns. For a given period $P$, the Fourier terms are defined as follows: $$\text{sin}_k(t) = \sin\left(\frac{2\pi kt}{P}\right), \quad \text{cos}_k(t) = \cos\left(\frac{2\pi kt}{P}\right)$$
 where $k$ is the frequency and $t$ is the time. Then a partial Fourier sum can be written as $$ y(t) = \beta_0 + \sum_{k=1}^{K} \left( \beta_{1k} \sin\left(\frac{2\pi kt}{P}\right) + \beta_{2k} \cos\left(\frac{2\pi kt}{P}\right) \right) $$
 where $K$ is the maximum order of Fourier terms to use.
 
 We used Fourier terms to model the daily and annual seasonality in the data. Since our dataset is missing data for some days, we needed to adjust the $t$ used to calculate the Fourier terms to account for these gaps. In the [`feature_engineering.R` script](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R), we added the variable `counter` to all dataframes. This variable increments by one for each time step (half hour, hour, or day) in the dataframe, reflecting the fact that some days are missing. These `counter` variables were then used later on to generate Fourier terms for our models. We wrote an `Rcpp` function in our package called `GenFT`, which creates a matrix of Fourier terms given a time counter variable representing $t$, the maximum order of the Fourier terms $K$, and the number of time increments in a period $P$.
-
-**Insert example of `generate_fourier_terms` function**
 
 ## Scaling
 
@@ -148,38 +187,7 @@ We had two hyperparameters to tune: the standard ridge regression parameter $\la
 
 ## Implementation
 
-We implemented ridge regression using `RcppArmadillo` in our function `RidgeReg`. We also wrote a function `RidgeRegPar` for ridge regression using `RcppParallel` to parallelise the matrix multiplication. We can compare the results of `RidgeRegPar` with those of the `glmnet` package:
-
-```{r}
-# library(glmnet)
-# 
-# # Example data
-# ex_x <- matrix(rnorm(100 * 20), 100, 20)
-# ex_y <- rnorm(100)
-# 
-# # Fit ridge regression using glmnet
-# fit_glmnet <- cv.glmnet(ex_x,
-#                         ex_y,
-#                         family = "gaussian",
-#                         alpha = 0,
-#                         type.measure = "mse",
-#                         nfolds = 10)
-# ex_pred_glmnet <- predict(fit_glmnet, newx = ex_x)
-# 
-# # Fit ridge regression using RidgeRegPar
-# fit_RidgeRegPar <- RidgeRegPar(ex_x,
-#                                ex_y, 
-#                                # Use same lambda as glmnet for comparison
-#                                lambda = fit_glmnet$lambda.1se * nrow(ex_x)
-#                                )
-# ex_pred_RidgeRegPar <- cbind(1, ex_x) %*% fit_RidgeRegPar$coefficients
-# 
-# # Compare predictions
-# ex_df <- data.frame(y = ex_y,
-#                     glmnet_pred = ex_pred_glmnet,
-#                     RidgeRegPar_pred = ex_pred_RidgeRegPar)
-
-```
+We implemented ridge regression using `RcppArmadillo` in our function `RidgeReg`. We also wrote a function `RidgeRegPar` for ridge regression using `RcppParallel` to parallelise the matrix multiplication. We end up with the same results as those of the `glmnet` package (see the "Comparison with `glmnet`" section of [`ridge_regression.Rmd`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main-edit-cbm/notes/ridge_regression.Rmd) for a demonstration).
 
 To select $\lambda$ and $K$, we used $k$-fold cross-validation to perform a grid search across all combinations of $\lambda$ and $K$. We implemented this cross-validation in the function `parallel_ridge_cross_validation`.
 
@@ -219,7 +227,7 @@ halfhr_ridge_results <- lapply(soc_classes, function(class) {
     time_counter = train_counter_halfhr,
     daily_period = 48,
     annual_period = 48 * 365,
-    max_K = 5,
+    max_K = 7,
     lambda_values = lambda_values_halfhr,
     n_folds = 10
   )
@@ -273,10 +281,13 @@ do.call(gridExtra::grid.arrange, c(halfhr_ridge_plots, ncol = 2))
 We can also examine the MSE on the test set for each class:
 
 ```{r}
-as.data.frame(lapply(halfhr_ridge_preds, function(x) x$error)) %>% 
-  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+halfhr_mse <- as.data.frame(lapply(halfhr_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "halfhr_MSE") %>% 
   # Remove _preds suffix from class column
   mutate(class = gsub("_preds", "", class))
+
+kableExtra::kable(halfhr_mse,
+                  col.names = c("Class", "Half hour: MSE"))
 ```
 
 ### Hour
@@ -312,7 +323,7 @@ hr_ridge_results <- lapply(soc_classes, function(class) {
     time_counter = train_counter_hr,
     daily_period = 24,
     annual_period = 24 * 365,
-    max_K = 5,
+    max_K = 7,
     lambda_values = lambda_values_hr,
     n_folds = 10
   )
@@ -366,10 +377,13 @@ do.call(gridExtra::grid.arrange, c(hr_ridge_plots, ncol = 2))
 Test set MSE:
 
 ```{r}
-as.data.frame(lapply(hr_ridge_preds, function(x) x$error)) %>% 
-  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+hr_mse <- as.data.frame(lapply(hr_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "hr_MSE") %>% 
   # Remove _preds suffix from class column
   mutate(class = gsub("_preds", "", class))
+
+kableExtra::kable(hr_mse,
+                  col.names = c("Class", "Hour: MSE"))
 ```
 
 ### Day
@@ -405,7 +419,7 @@ day_ridge_results <- lapply(soc_classes, function(class) {
     time_counter = train_counter_day, 
     daily_period = 1,
     annual_period = 365,
-    max_K = 5,
+    max_K = 7,
     lambda_values = lambda_values_day,
     n_folds = 10
   )
@@ -459,11 +473,44 @@ do.call(gridExtra::grid.arrange, c(day_ridge_plots, ncol = 2))
 Test set MSE:
 
 ```{r}
-as.data.frame(lapply(day_ridge_preds, function(x) x$error)) %>% 
-  pivot_longer(cols = everything(), names_to = "class", values_to = "MSE") %>% 
+day_mse <- as.data.frame(lapply(day_ridge_preds, function(x) x$error)) %>% 
+  pivot_longer(cols = everything(), names_to = "class", values_to = "day_MSE") %>% 
   # Remove _preds suffix from class column
   mutate(class = gsub("_preds", "", class))
+
+kableExtra::kable(day_mse,
+                  col.names = c("Class", "Day: MSE"))
 ```
+
+## Conclusions
+
+For half-hourly and hourly data, ridge regression captures the general pattern of daily fluctuation for each social class, but the models fail to capture the maximum daily peaks in the testing set.
+
+The model has very poor performance at the day resolution across all social classes. In certain classes, the predictions show peaks in demand located at the same dates as in the true demand data, but the predictions are far too low.
+
+We can compare the performance of the ridge regression models between the social classes as well:
+
+```{r}
+overall_ridge_mse <- halfhr_mse %>% 
+  left_join(hr_mse, by = "class") %>% 
+  left_join(day_mse, by = "class")
+
+overall_ridge_mse %>% 
+  pivot_longer(cols = -class, names_to = "time_scale", values_to = "MSE") %>%
+  mutate(time_scale = gsub("_MSE", "", time_scale)) %>% 
+  ggplot(aes(x = class, y = MSE, fill = time_scale)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Social class", y = "Ridge regression MSE", fill = "Time scale") +
+  theme_bw()
+```
+
+We see that the half-hourly and hourly models yield similar MSE values for all social class, while the day models always have higher MSEs. For all time scales, the models on class F have the worst performance. Class F contained the fewest households by far, perhaps accounting for the poor performance of the models.
+
+Some of the performance issues may be due to the way we implemented cross-validation.
+
+**Insert limitations of CV for time series**
+
+Our cross-validation procedure almost always selected the maximum number of Fourier terms $K$, except for the daily resolution, and always selected the lowest provided $\lambda$ value.
 
 # Gaussian Process Regression
 
@@ -637,4 +684,8 @@ gaussian_process_reg <- function(data,
 
 
 # Results
+
+## Ridge regression
+
+
 
