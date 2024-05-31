@@ -1,6 +1,6 @@
 ---
-title: "SC-2 Electric Boogalo"
-subtitle: "Regression on Irish electricity demand aggregated by class"
+title: "Regression on Irish electricity demand aggregated by class"
+subtitle: "SC/SM-2 Group Project"
 author: "Kieran Morris, Cecina Babich Morrow and Sherman Khoo"
 urlcolor: blue
 output:
@@ -35,9 +35,11 @@ survey <- Irish[["survey"]]
 extra <- Irish[["extra"]]
 ```
 
+We trimmed the dataset slightly to focus on the year of 2010 only.
+
 ## Social class
 
-We wanted to investigate demand patterns across different social classes. The dataset includes 5 social classes, defined by the occupation of the head of household:
+Our goal in this project is to **investigate demand patterns across different social classes**. The dataset includes 5 social classes, defined by the occupation of the head of household:
 
 + AB: managerial roles, administrative or professional
 + C1: supervisory, clerical, junior managerial
@@ -71,7 +73,7 @@ df_day %>%
   theme_bw()
 ```
 
-Because of these class-specific differences, we modeled the average demand for each social class separately.
+Due to the computational expense of fitting our model, we simplify the problem and consider modelling the average demand for each social class separately, i.e., we fit a seperate model for each social class. However, a further extension that may be considered is to include the social class as a categorical variable and possibly even further interaction term, to investigate the impact of social class on demand more directly.
 
 ## Loading and Structure
 
@@ -145,7 +147,7 @@ We used Fourier terms to model the daily and annual seasonality in the data. Sin
 
 ## Scaling
 
-For ridge regression, we centered and scaled all variables used in the models to have mean 0 and standard deviation 1. For Gaussian process regression, we used the unscaled data.
+For ridge regression, we centered and scaled all variables used in the models to have mean 0 and standard deviation 1. This is because there is a single universal penalty ($\lambda$ for ridge regression) for all covariates, and hence if the covariates are of different scale, the penalisation may not be meaningful. For Gaussian process regression, we used the unscaled data.
 
 ## Training and testing
 
@@ -185,6 +187,8 @@ where $\beta \in \mathbb{R}^p$, $\alpha \in \mathbb{R}$, and for all $i, l \in \
 $$(\hat{\alpha}_\lambda, \hat{\beta}_\lambda) = \mathrm{argmin}_{\alpha \in \mathbb{R}, \beta \in \mathbb{R}^p} \lVert y^0 - \alpha - \boldsymbol{X}^0 \beta \rVert^2_2 + \lambda \lVert \beta \rVert^2_2$$
 where $\lambda > 0$ is a tuning parameter and $\lVert \cdot \rVert_2$ denotes the Euclidean norm. Ridge regression is thus imposing a penalty on the size of $\beta$, with the strength of that penalty determined by the choice of $\lambda$. The coefficients of the model $\beta$ will be shrunk towards zero, but will not be set to zero (as opposed to in lasso regression).
 
+We consider using this model as we have performed significant feature transformation, and thus are at risk of overfitting the data. In this case, penalised regression can be used to reduce overfitting in our model and to produce a better predictive performance.
+
 ## Model
 
 We performed ridge regression using the model detailed above, with the following input variables:
@@ -205,7 +209,7 @@ We had two hyperparameters to tune: the standard ridge regression parameter $\la
 
 We implemented ridge regression using `RcppArmadillo` in our functions `RidgeReg` and `RidgeRegPar`, the latter of which uses `RcppParallel` to parallelise the matrix multiplication. These functions yield the same predictions as those of the `glmnet` package (see the "Comparison with `glmnet`" section of [`ridge_regression.Rmd`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main-edit-cbm/notes/ridge_regression.Rmd) for a demonstration).
 
-To select $\lambda$ and $K$, we used $k$-fold cross-validation to perform a grid search across all combinations of $\lambda$ and $K$. We implemented this cross-validation in the function `parallel_ridge_cross_validation`, which calls `RidgeRegPar`. An extension of this work could involve parallelizing the grid search in addition to the matrix multiplication, although we did not encounter performance issues for data of this size.
+To select $\lambda$ and $K$, we used $k$-fold cross-validation to perform a grid search across all combinations of $\lambda$ and $K$. We implemented this cross-validation in the function `parallel_ridge_cross_validation`, which calls `RidgeRegPar`. An extension of this work could involve parallelising the grid search in addition to the matrix multiplication, although we did not encounter performance issues for data of this size.
 
 ## Results
 
@@ -548,7 +552,7 @@ kableExtra::kable(day_mse,
 
 For half-hourly and hourly data, ridge regression captures the general pattern of daily fluctuation for each social class fairly well. However, the models consistently fail to capture the maximum daily peaks in the testing set.
 
-The model has very poor performance at the day resolution across all social classes. In certain classes, the predictions show peaks in demand located at the same dates as in the true demand data, but the predictions are far too low. Since we were testing on the last 10% of dates in the dataset, which included the dates 24 November 2010 to 31 December 2010, the model might have been underestimating the increased electricity demand in winter months. When we look at the plot of predictions on the entire daily resolution dataset, we can see that demand patterns in the last 10% of the days have very distinct patterns compared to the training data, with two large spikes in demand towards the end of the year. This indicates that there may have been other factors influencing demand in this time period not accounted for by our model. The poor daily results may also indicate that we need to account for seasonality differently at this time resolution. Adding daily Fourier terms was probably not useful at a daily resolution, and potentially adding weekly or monthly terms instead might have improved performance.
+The model has very poor performance at the daily resolution across all social classes. In certain classes, the predictions show peaks in demand located at the same dates as in the true demand data, but the predictions are far too low. Since we were testing on the last 10% of dates in the dataset, which included the dates 24 November 2010 to 31 December 2010, the model might have been underestimating the increased electricity demand in winter months. When we look at the plot of predictions on the entire daily resolution dataset, we can see that demand patterns in the last 10% of the days have very distinct patterns compared to the training data, with two large spikes in demand towards the end of the year. This indicates that there may have been other factors influencing demand in this time period not accounted for by our model. The poor daily results may also indicate that we need to account for seasonality differently at this time resolution. Adding daily Fourier terms was probably not useful at a daily resolution, and potentially adding weekly or monthly terms instead might have improved performance.
 
 We can compare the performance of the ridge regression models between the social classes as well:
 
@@ -572,7 +576,7 @@ Some of the performance issues may be due to the way we implemented cross-valida
 
 # Gaussian Process Regression
 
-The second class of models we implemented was Gaussian Process Regression.
+The second class of models we implemented was Gaussian Process Regression, which is a more flexible and powerful non-parametric Bayesian approach, although this comes at the cost of a higher computational burden.
 
 ## Theory
 
@@ -605,7 +609,7 @@ $$Y^0 \sim \text{N}(0,K _ \lambda I_n),$$
 
 to simulate our results. 
 
-In practice, to find the posterior distribution, we maximise the marginal log-likelihood.
+In practice, to produce a full Bayesian approach, we would be required to sample from the posterior distribution directly, which is highly computationally expensive. Hence, we adopt a simpler Empirical Bayes approach, which finds the optimal hyperparameter via maximising the marginal (log) likelihood. We discuss this further in the next section. 
 
 ## Model
 
@@ -619,7 +623,7 @@ $$
 k(x, x') = \exp\left(-\frac{\lVert x - x' \rVert^2}{2l}\right)
 $$
 
-We also have the hyperparameter $\sigma$ which is the standard deviation of our noise. In order to find the ideal hyperparameters we will attempt to maximize the marginal log likelihood. The marginal log likelihood is given by:
+We also have the hyperparameter $\sigma$ which is the standard deviation of our noise. In order to find the ideal hyperparameters we will attempt to maximise the marginal log likelihood. The marginal log likelihood is given by:
 
 $$
 \log p(y^0 \mid x^0, l,\sigma^2) = -\frac{1}{2} y^0 (K + \sigma^2 I_n)^{-1} y^0 - \frac{1}{2} \log \lvert K + \sigma^2 I_n \rvert 
@@ -677,7 +681,7 @@ arma::vec optimise_gaussian_process(arma::mat X, arma::vec y) {
 }
 ```
 
-We parallize over the grid of initial choices to speed up the optimisation. As we going to be performing this on different sized datasets (half hourly, hourly and daily) it is unwise to perform parallisation over those. Instead we created an wrapper function in `R` which can take in an arbitrary dataset. We display it below but it can be found in [`gauss_process_reg.R`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/gauss_process_reg.R):
+We parallelise over the grid of initial choices to speed up the optimisation. As we are going to be performing this on different sized datasets (half hourly, hourly and daily) it is unwise to perform parallelisation over those. Instead we created an wrapper function in `R` which can take in an arbitrary dataset. We display it below but it can be found in [`gauss_process_reg.R`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/gauss_process_reg.R):
 
 ```{r}
 find_optimal_params <- function(X, y) {
@@ -695,7 +699,7 @@ find_optimal_params <- function(X, y) {
 
 ## Implementation
 
-For the Gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate Gaussian process regression, allowing us to add our additional features as covariates. Since we have our ideal hyperparameters $l$ and $\sigma$ for each dataset, we can now fit the Gaussian process regression model fairly easily. Source code for the following can be found in [`gauss_process_reg.R`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/gauss_process_reg.R):
+For the Gaussian process regression, we will use the `kernlab::gausspr` function, which can perform multivariate Gaussian process regression, possibly allowing us to add further covariates as well. Since we have our ideal hyperparameters $l$ and $\sigma$ for each dataset, we can now fit the Gaussian process regression model fairly easily. Source code for the following can be found in [`gauss_process_reg.R`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/gauss_process_reg.R):
 
 ```{r}
 gaussian_process_reg <- function(data,
@@ -785,7 +789,7 @@ combined_plot <- plot_grid(plotlist = all_grobs,ncol = 2)
 print(combined_plot)
 ```
 
-Unfortunately, as a side affect of the Gaussian kernel, we has considerable trail off at the end of the data, meaning the `mse` on our test set is quite high. In terms of general fit for the training set it performs quite well - but without a meaningful performance metric we cannot confirm whether this is overfitting. This is a pattern we will see with the half-hourly and hourly data too.
+Unfortunately, due to poor fitting of the Gaussian kernel bandwidth, we has considerable trail off at the end of the data, meaning the `mse` on our test set is quite high. In terms of general fit for the training set it performs quite well - but without a meaningful performance metric we cannot confirm whether this is overfitting. This is a pattern we will see with the half-hourly and hourly data too.
 
 We can compare the MSE values for each class:
 
@@ -851,7 +855,7 @@ kableExtra::kable(halfhr_gpr_mse,
 
 ## Conclusions
 
-Despite good fits on the cyclic data, the Gaussian process regression has terrible predictive ability for the future. Further tests could be done to demonstrate its effectiveness on a random test set sampled from the data, which we predict it would perform much better on.
+Despite good interpolation performed by the Gaussian Process Regression model, we were unable to find a model with good predictive ability. This stems from the difficulty in tuning the hyperparameters (mainly the kernel bandwidth), and the sensitivity of the model to the hyperparameters. Furthermore, the large, time-series dataset limited further validation efforts, and so further investigation into this model and tuning the performance for this dataset is required.
 
 We can compare the performance of the Gaussian process regression models between the social classes:
 
@@ -874,13 +878,15 @@ The daily models have the best performance, with the hourly and half-hourly havi
 
 # Overall conclusions
 
-In this project, we implemented ridge regression and Gaussian process regression to predict electricity demand for individual social classes at different time resolutions. 
+In this project, we implemented two different approaches for modelling to predict electricity demand for individual social classes at different time resolutions. Firstly, a relatively simpler, parametric approach with a ridge regression model was used, with significant feature transformation. Secondly, a more flexible non-parametric Gaussian Process Regression model was used.   
 
 We found that the ridge regression models performed relatively well on the test set at half-hourly and hourly resolutions, but their predictions did not reach to the daily maximum demands. The ridge regression models performed poorly at the daily resolution across all social classes, potentially indicating that we need to account for seasonality differently at this time resolution. The social class containing the lowest number of households, class F, had the poorest performance.
 
-The Gaussian process regression models had reasonable fits on the training data at all time scales.  As with ridge regression, these models also failed to fully reach the daily maximum peaks, perhaps indicating that both our models are missing some key features causing the maximum peaks. Interestingly, Gaussian process regression was able to capture the patterns of daily fluctuations in the training data as well as ridge regression, despite not only using the time counter as a predictor and excluding temperature, Fourier terms, etc. The Gaussian process regression models had poor predictive ability on the test set for all resolutions, which may be due to the Gaussian kernel's tendency to trail off at the end of the data.
+The Gaussian process regression models had reasonable fits on the training data at all time scales.  As with ridge regression, these models also failed to fully reach the daily maximum peaks, perhaps indicating that both our models are missing some key features causing the maximum peaks. Interestingly, Gaussian process regression was able to capture the patterns of daily fluctuations in the training data as well as ridge regression, despite not only using the time counter as a predictor and excluding temperature, Fourier terms, etc. The Gaussian process regression models had poor predictive ability on the test set for all resolutions, which may indicate the need for further fine-tuning of the performance of this model.
 
-We cannot directly compare the performances of the two types of models using the MSE values since ridge regression was performed on scaled data and Gaussian process regression was performed on the unscaled. Additionally, the half-hourly and hourly Gaussian process regression models were only run on one week of the data due to computational constraints. When examining the overall patterns in MSE for each set of models, however, the ridge regression performed best on the half-hour and hour resolution, while Gaussian process regression was most successful at the day resolution. When comparing between social classes, the ridge regression models had poor performance on class F, the class with fewest households, while the Gaussian process regression actually performed worst on class DE, the class with the most households. 
+We cannot directly compare the performances of the two types of models using the MSE values since ridge regression was performed on scaled data and Gaussian process regression was performed on unscaled. Additionally, the half-hourly and hourly Gaussian process regression models were only run on one week of the data due to computational constraints. When examining the overall patterns in MSE for each set of models, however, the ridge regression performed best on the half-hour and hour resolution, while Gaussian process regression was most successful at the day resolution. When comparing between social classes, the ridge regression models had poor performance on class F, the class with fewest households, while the Gaussian process regression actually performed worst on class DE, the class with the most households.
+
+Our differing result from these two models points to an inherent trade-off in Statistical modelling - while more powerful models such as Gaussian process regression allows for the possibility of a stronger fit to the data-generating process, especially compared to simpler models such as Linear Regression, they also come with significant computational burden and more difficult hyperparameter tuning. Thus, while Ridge Regression was a far simpler model, we find that in terms of the entire Statistical modelling workflow, Ridge Regression allowed us to build work faster along the modelling process. 
 
 
 
