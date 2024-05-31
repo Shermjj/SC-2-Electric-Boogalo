@@ -294,7 +294,7 @@ for (class in as.character(soc_classes)) {
 do.call(gridExtra::grid.arrange, c(halfhr_ridge_plots, ncol = 2))
 ```
 
-Each plot shows the $K$ and $lambda$ values selected by cross-validation and used to predict the demand on the test set. The red line represents the predicted demand, while the black line represents the true demand.
+Each plot shows the $K$ and $\lambda$ values selected by cross-validation and used to predict the demand on the test set. The red line represents the predicted demand, while the black line represents the true demand.
 
 We can also examine the MSE on the test set for each class:
 
@@ -490,7 +490,7 @@ do.call(gridExtra::grid.arrange, c(day_ridge_plots, ncol = 2))
 
 We have very poor performance on the testing set at the daily resolution. To investigate the issue, we can plot the predictions on the entire dataset (training and testing). The orange line shows the predictions, the black line shows the demand, and the vertical grey dashed line separates the training and testing sets:
 
-```{r}
+```{r fig.height=8}
 # Get predictions for each model on the train set
 day_x_train <- as.matrix(day_features_train[,7:ncol(day_features_train)])
 day_ridge_preds_train <- lapply(soc_classes, function(class) {
@@ -606,6 +606,10 @@ $$Y^0 \sim \text{N}(0,K _ \lambda I_n),$$
 to simulate our results. 
 
 In practice, to find the posterior distribution, we maximise the marginal log-likelihood.
+
+## Model
+
+We performed Gaussian process regression using the time counter variable generated in  [`feature_engineering.R`](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/feature_engineering.R) as the input variable $x$. As in ridge regression, we predicted demand for each of the five social classes at all three time scales (half hour, hour, and day).
  
 ## Tuning hyperparameters
 
@@ -756,7 +760,7 @@ We then ran the Gaussian Process Regression model on the three datasets. We can 
 
 Considering the daily data aggregation removed a lot of the complexity of the model, the GPR had no trouble with a fit:
 
-```{r fig.height=10}
+```{r message = FALSE, fig.height=10}
 library(jpeg)
 library(grid)
 library(cowplot)
@@ -783,6 +787,15 @@ print(combined_plot)
 
 Unfortunately, as a side affect of the Gaussian kernel, we has considerable trail off at the end of the data, meaning the `mse` on our test set is quite high. In terms of general fit for the training set it performs quite well - but without a meaningful performance metric we cannot confirm whether this is overfitting. This is a pattern we will see with the half-hourly and hourly data too.
 
+We can compare the MSE values for each class:
+
+```{r}
+day_gpr_mse <- readRDS(here::here("data/data_gpr/mse_results_day.RData"))
+kableExtra::kable(day_gpr_mse,
+                  col.names = c("Class", "Day: MSE"))
+```
+
+
 ### Aggregated Hourly Data
 
 For hourly data, we can clearly see the daily cycles appearing, fortunately our GPR is able to get a pretty accurate fit, including the daily peaks of electricity consumption. The same `sigma` was applied to the yearly set (and can be found in the `data` file in the github rep) and it performed much worse, but that's to be expected.
@@ -800,6 +813,14 @@ all_grobs2 <- lapply(image_files2, image_to_grob)
 combined_plot2 <- plot_grid(plotlist = all_grobs2,ncol = 2)
 
 print(combined_plot2)
+```
+
+We can compare the hourly MSE values by class:
+
+```{r}
+hour_gpr_mse <- readRDS(here::here("data/data_gpr/mse_results_hour.RData"))
+kableExtra::kable(hour_gpr_mse,
+                  col.names = c("Class", "Hour: MSE"))
 ```
 
 ### Aggregated Half-Hourly Data
@@ -820,18 +841,46 @@ combined_plot3 <- plot_grid(plotlist = all_grobs3,ncol = 2)
 print(combined_plot3)
 ```
 
+Finally, here are the half-hourly MSE values by class:
+
+```{r}
+halfhr_gpr_mse <- readRDS(here::here("data/data_gpr/mse_results_half_hour.RData"))
+kableExtra::kable(halfhr_gpr_mse,
+                  col.names = c("Class", "Half hour: MSE"))
+```
 
 ## Conclusions
 
 Despite good fits on the cyclic data, the Gaussian process regression has terrible predictive ability for the future. Further tests could be done to demonstrate its effectiveness on a random test set sampled from the data, which we predict it would perform much better on.
 
+We can compare the performance of the Gaussian process regression models between the social classes:
+
+```{r}
+overall_gpr_mse <- halfhr_gpr_mse %>% 
+  left_join(hour_gpr_mse, by = "class") %>% 
+  left_join(day_gpr_mse, by = "class")
+colnames(overall_gpr_mse) <- c("class", "halfhr_MSE", "hr_MSE", "day_MSE")
+
+overall_gpr_mse %>% 
+  pivot_longer(cols = -class, names_to = "time_scale", values_to = "MSE") %>%
+  mutate(time_scale = gsub("_MSE", "", time_scale)) %>% 
+  ggplot(aes(x = class, y = MSE, fill = time_scale)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Social class", y = "Gaussian process regression MSE", fill = "Time scale") +
+  theme_bw()
+```
+
+The daily models have the best performance, with the hourly and half-hourly having similar, higher MSE values. For all time scales, the models on class DE have the worst performance, which is interesting given that DE contained the greatest number of households.
+
 # Overall conclusions
 
 In this project, we implemented ridge regression and Gaussian process regression to predict electricity demand for individual social classes at different time resolutions. 
 
-We found that the ridge regression models performed relatively well on the test set at half-hourly and hourly resolutions, but their predictions did not reach to the daily maximum demands. The ridge regression models performed poorly at the daily resolution across all social classes, potentially indicating that we need to account for seasonality differently at this time resolution.
+We found that the ridge regression models performed relatively well on the test set at half-hourly and hourly resolutions, but their predictions did not reach to the daily maximum demands. The ridge regression models performed poorly at the daily resolution across all social classes, potentially indicating that we need to account for seasonality differently at this time resolution. The social class containing the lowest number of households, class F, had the poorest performance.
 
-The Gaussian process regression models had reasonable fits on the training data at all time scales. These models also failed to fully reach the daily maximum peaks, perhaps indicating that both our models are missing some key features causing the maximum peaks. The Gaussian process regression models had poor predictive ability on the test set, which may be due to the Gaussian kernel's tendency to trail off at the end of the data.
+The Gaussian process regression models had reasonable fits on the training data at all time scales.  As with ridge regression, these models also failed to fully reach the daily maximum peaks, perhaps indicating that both our models are missing some key features causing the maximum peaks. Interestingly, Gaussian process regression was able to capture the patterns of daily fluctuations in the training data as well as ridge regression, despite not only using the time counter as a predictor and excluding temperature, Fourier terms, etc. The Gaussian process regression models had poor predictive ability on the test set for all resolutions, which may be due to the Gaussian kernel's tendency to trail off at the end of the data.
+
+We cannot directly compare the performances of the two types of models using the MSE values since ridge regression was performed on scaled data and Gaussian process regression was performed on the unscaled. Additionally, the half-hourly and hourly Gaussian process regression models were only run on one week of the data due to computational constraints. When examining the overall patterns in MSE for each set of models, however, the ridge regression performed best on the half-hour and hour resolution, while Gaussian process regression was most successful at the day resolution. When comparing between social classes, the ridge regression models had poor performance on class F, the class with fewest households, while the Gaussian process regression actually performed worst on class DE, the class with the most households. 
 
 
 
