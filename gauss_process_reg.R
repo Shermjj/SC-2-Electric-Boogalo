@@ -127,7 +127,7 @@ display_plots <- function(class_name) {
 
 
 get_rmse <- function(class) {
-  perf <- gaussian_process_reg(df_day, class = class, plot = TRUE)$performance
+  perf <- gaussian_process_reg(df_half_hour[1:336,], class = class, plot = TRUE)$performance
   return(data.frame(class = class, mse = perf))
 }
 
@@ -139,4 +139,4 @@ mse_results <- do.call(rbind, lapply(class_names, get_rmse))
 # Print the results
 print(mse_results)
 
-saveRDS(mse_results,)
+saveRDS(mse_results, file = "data/data_gpr/mse_results_half_hour.RData")
