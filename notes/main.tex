@@ -1,6 +1,7 @@
 % Options for packages loaded elsewhere
 \PassOptionsToPackage{unicode}{hyperref}
 \PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
 %
 \documentclass[
 ]{article}
@@ -77,6 +78,16 @@
 \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
 \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
 \usepackage{graphicx}
 \makeatletter
 \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
@@ -94,6 +105,20 @@
 \providecommand{\tightlist}{%
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \setcounter{secnumdepth}{5}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
 \ifLuaTeX
   \usepackage{selnolig}  % disable illegal ligatures
 \fi
@@ -102,8 +127,12 @@
 \urlstyle{same}
 \hypersetup{
   pdftitle={SC-2 Electric Boogalo},
-  pdfauthor={Kieran Morris, Cecina Babich Morrow and Sherman Kjo},
-  hidelinks,
+  pdfauthor={Kieran Morris, Cecina Babich Morrow and Sherman Khoo},
+  colorlinks=true,
+  linkcolor={Maroon},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={blue},
   pdfcreator={LaTeX via pandoc}}
 
 \title{SC-2 Electric Boogalo}
@@ -114,13 +143,14 @@
 }
 \makeatother
 \subtitle{Regression on the Irish datset agregated by class}
-\author{Kieran Morris, Cecina Babich Morrow and Sherman Kjo}
+\author{Kieran Morris, Cecina Babich Morrow and Sherman Khoo}
 \date{}
 
 \begin{document}
 \maketitle
 
 {
+\hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
@@ -155,6 +185,7 @@ from the \texttt{electBook} package. We have three datasets:
 \begin{Highlighting}[]
 \CommentTok{\# Extract individual dataframes}
 \FunctionTok{library}\NormalTok{(electBook)}
+\FunctionTok{library}\NormalTok{(tidyverse)}
 \FunctionTok{data}\NormalTok{(Irish)}
 \NormalTok{indCons }\OtherTok{\textless{}{-}}\NormalTok{ Irish[[}\StringTok{"indCons"}\NormalTok{]]}
 \NormalTok{survey }\OtherTok{\textless{}{-}}\NormalTok{ Irish[[}\StringTok{"survey"}\NormalTok{]]}
@@ -188,12 +219,51 @@ occupation of the head of household:
 \begin{Highlighting}[]
 \CommentTok{\# Vector of social classes}
 \NormalTok{soc\_classes }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\FunctionTok{unique}\NormalTok{(survey[}\StringTok{"SOCIALCLASS"}\NormalTok{]))}\SpecialCharTok{$}\NormalTok{SOCIALCLASS}
+
+\CommentTok{\# Number of households per class}
+\NormalTok{survey }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{group\_by}\NormalTok{(SOCIALCLASS) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{summarise}\NormalTok{(}\AttributeTok{n\_households =} \FunctionTok{n}\NormalTok{()) }\SpecialCharTok{\%\textgreater{}\%} 
+\NormalTok{  kableExtra}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(}\AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Social Class"}\NormalTok{, }\StringTok{"Number of Households"}\NormalTok{))}
 \end{Highlighting}
 \end{Shaded}
 
-** Insert plot of demand patterns for different classes **
+\begin{longtable}[]{@{}lr@{}}
+\toprule\noalign{}
+Social Class & Number of Households \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+AB & 410 \\
+C1 & 730 \\
+C2 & 449 \\
+DE & 1018 \\
+F & 65 \\
+\end{longtable}
 
-We modeled the average demand for each social class separately.
+We can look at the average daily demand for each social class to see the
+differences in patterns between classes:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{df\_day }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/df\_day.RData"}\NormalTok{))}
+
+\CommentTok{\# Plot average daily demand for each social class}
+\NormalTok{df\_day }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{dateTime =} \FunctionTok{as.POSIXct}\NormalTok{(}\FunctionTok{rownames}\NormalTok{(df\_day))) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{pivot\_longer}\NormalTok{(}\AttributeTok{cols =} \FunctionTok{all\_of}\NormalTok{(soc\_classes), }\AttributeTok{names\_to =} \StringTok{"class"}\NormalTok{, }\AttributeTok{values\_to =} \StringTok{"demand"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime, }\AttributeTok{y =}\NormalTok{ demand, }\AttributeTok{color =}\NormalTok{ class)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_line}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{, }\AttributeTok{color =} \StringTok{"Social Class"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-3-1.pdf}
+
+Because of these class-specific differences, we modeled the average
+demand for each social class separately.
 
 \hypertarget{loading-and-structure}{%
 \subsection{Loading and Structure}\label{loading-and-structure}}
@@ -235,9 +305,9 @@ folder}.
 \subsubsection{Time-related features}\label{time-related-features}}
 
 We extracted the hour of the day and the month from the date-time
-variable. We also included a quadratic term for temperature to capture
-the non-linear relationship between temperature and demand. We also used
-one-hot encoding to include the day of the week in our models.
+variable. For the dataset at daily resolution, we did not use hour of
+the day. We also used one-hot encoding to include the day of the week in
+our models.
 
 \hypertarget{temperature}{%
 \subsubsection{Temperature}\label{temperature}}
@@ -247,14 +317,25 @@ demand over time across all households:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\FunctionTok{library}\NormalTok{(tidyverse)}
-
 \CommentTok{\# Aggregate demand over all households}
 \NormalTok{agg }\OtherTok{\textless{}{-}} \FunctionTok{rowSums}\NormalTok{(indCons)}
 \CommentTok{\# Add temperature data}
 \NormalTok{temp\_demand }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{demand =}\NormalTok{ agg) }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{bind\_cols}\NormalTok{(Irish[[}\StringTok{"extra"}\NormalTok{]])}
 
+\CommentTok{\# Demand vs. temperature}
+\FunctionTok{ggplot}\NormalTok{(temp\_demand, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ temp, }\AttributeTok{y =}\NormalTok{ demand)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{x =} \StringTok{"Temperature"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Total Demand"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-5-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Demand over time colored by temperature}
 \FunctionTok{ggplot}\NormalTok{(temp\_demand, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime, }\AttributeTok{y =}\NormalTok{ demand, }\AttributeTok{color =}\NormalTok{ temp)) }\SpecialCharTok{+}
   \FunctionTok{geom\_point}\NormalTok{() }\SpecialCharTok{+}
 \NormalTok{  viridis}\SpecialCharTok{::}\FunctionTok{scale\_color\_viridis}\NormalTok{(}\AttributeTok{option =} \StringTok{"magma"}\NormalTok{) }\SpecialCharTok{+}
@@ -263,14 +344,40 @@ demand over time across all households:
 \end{Highlighting}
 \end{Shaded}
 
-\includegraphics{main_files/figure-latex/unnamed-chunk-4-1.pdf}
+\includegraphics{main_files/figure-latex/unnamed-chunk-5-2.pdf}
 
 We can see that during the warmer summer months, demand dips, although
 the pattern is messy. We included linear and quadratic terms for
-temperature in our models.
+temperature in our models to capture the non-linear relationship between
+temperature and demand.
 
 \hypertarget{fourier-terms}{%
 \subsubsection{Fourier terms}\label{fourier-terms}}
+
+We found evidence for daily and annual seasonality patterns in our data.
+The temperature plot above shows the annual pattern of high energy usage
+in winter months, with a dip in the summer months. To see the pattern of
+daily fluctuations, we can view total demand by hour of the day:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot demand for each hour }
+\NormalTok{agg\_hour }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{total\_demand =}\NormalTok{ agg) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{select}\NormalTok{(extra, dateTime)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{hour =} \FunctionTok{hour}\NormalTok{(dateTime))}
+\FunctionTok{ggplot}\NormalTok{(agg\_hour, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ hour, }\AttributeTok{y =}\NormalTok{ total\_demand)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{geom\_smooth}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{x =} \StringTok{"Hour"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Total Demand"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## `geom_smooth()` using method = 'gam' and formula = 'y ~ s(x, bs = "cs")'
+\end{verbatim}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-6-1.pdf}
 
 We used Fourier terms to capture the patterns of seasonality in the
 data. Fourier terms are a set of sine and cosine functions with
@@ -297,8 +404,6 @@ time counter variable representing \(t\), the maximum order of the
 Fourier terms \(K\), and the number of time increments in a period
 \(P\).
 
-\textbf{Insert example of \texttt{generate\_fourier\_terms} function}
-
 \hypertarget{scaling}{%
 \subsection{Scaling}\label{scaling}}
 
@@ -315,8 +420,28 @@ first 90\% of the rows and tested on the final 10\%.
 \section{\texorpdfstring{\texttt{ElecForecast}
 package}{ElecForecast package}}\label{elecforecast-package}}
 
-\textbf{Insert short description of package, what it does, how to
-install it}
+We present a fully documented and tested package, \texttt{ElecForecast},
+which is available on github
+\href{https://github.com/Shermjj/SC-2-Electric-Boogalo}{here}. The
+package binary is available
+\href{https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast_1.0_R_x86_64-pc-linux-gnu.tar.gz}{here},
+and can be used for installation, as we will show.
+
+To install the package binary, we can call the following function:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{install.packages}\NormalTok{(}\StringTok{"ElecForecast\_1.0\_R\_x86\_64{-}pc{-}linux{-}gnu.tar.gz"}\NormalTok{, }\AttributeTok{repos =} \ConstantTok{NULL}\NormalTok{, }\AttributeTok{type=}\StringTok{"source"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{figure}
+\centering
+\includegraphics{~/docs/code/SC-2-Electric-Boogalo/notes/main_files/install.png}
+\caption{Installation}
+\end{figure}
+
+We can then load the package as with any other R package.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -324,6 +449,21 @@ install it}
 \FunctionTok{library}\NormalTok{(ElecForecast)}
 \end{Highlighting}
 \end{Shaded}
+
+In order to view the documentation of this package, we can prepend
+\texttt{?} to any functions exposed in this package, for example:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{?GenFT}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{figure}
+\centering
+\includegraphics{~/docs/code/SC-2-Electric-Boogalo/notes/main_files/docs.png}
+\caption{Documentation}
+\end{figure}
 
 \hypertarget{ridge-regression}{%
 \section{Ridge Regression}\label{ridge-regression}}
@@ -386,40 +526,11 @@ value for both the daily and the annual terms.
 We implemented ridge regression using \texttt{RcppArmadillo} in our
 function \texttt{RidgeReg}. We also wrote a function
 \texttt{RidgeRegPar} for ridge regression using \texttt{RcppParallel} to
-parallelise the matrix multiplication. We can compare the results of
-\texttt{RidgeRegPar} with those of the \texttt{glmnet} package:
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\CommentTok{\# library(glmnet)}
-\CommentTok{\# }
-\CommentTok{\# \# Example data}
-\CommentTok{\# ex\_x \textless{}{-} matrix(rnorm(100 * 20), 100, 20)}
-\CommentTok{\# ex\_y \textless{}{-} rnorm(100)}
-\CommentTok{\# }
-\CommentTok{\# \# Fit ridge regression using glmnet}
-\CommentTok{\# fit\_glmnet \textless{}{-} cv.glmnet(ex\_x,}
-\CommentTok{\#                         ex\_y,}
-\CommentTok{\#                         family = "gaussian",}
-\CommentTok{\#                         alpha = 0,}
-\CommentTok{\#                         type.measure = "mse",}
-\CommentTok{\#                         nfolds = 10)}
-\CommentTok{\# ex\_pred\_glmnet \textless{}{-} predict(fit\_glmnet, newx = ex\_x)}
-\CommentTok{\# }
-\CommentTok{\# \# Fit ridge regression using RidgeRegPar}
-\CommentTok{\# fit\_RidgeRegPar \textless{}{-} RidgeRegPar(ex\_x,}
-\CommentTok{\#                                ex\_y, }
-\CommentTok{\#                                \# Use same lambda as glmnet for comparison}
-\CommentTok{\#                                lambda = fit\_glmnet$lambda.1se * nrow(ex\_x)}
-\CommentTok{\#                                )}
-\CommentTok{\# ex\_pred\_RidgeRegPar \textless{}{-} cbind(1, ex\_x) \%*\% fit\_RidgeRegPar$coefficients}
-\CommentTok{\# }
-\CommentTok{\# \# Compare predictions}
-\CommentTok{\# ex\_df \textless{}{-} data.frame(y = ex\_y,}
-\CommentTok{\#                     glmnet\_pred = ex\_pred\_glmnet,}
-\CommentTok{\#                     RidgeRegPar\_pred = ex\_pred\_RidgeRegPar)}
-\end{Highlighting}
-\end{Shaded}
+parallelise the matrix multiplication. We end up with the same results
+as those of the \texttt{glmnet} package (see the ``Comparison with
+\texttt{glmnet}'' section of
+\href{https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main-edit-cbm/notes/ridge_regression.Rmd}{\texttt{ridge\_regression.Rmd}}
+for a demonstration).
 
 To select \(\lambda\) and \(K\), we used \(k\)-fold cross-validation to
 perform a grid search across all combinations of \(\lambda\) and \(K\).
@@ -439,13 +550,13 @@ We first split the dataset into training and testing sets:
 \CommentTok{\# Split the data into training and test sets}
 \CommentTok{\# 90\% training set}
 \NormalTok{n\_train\_halfhr }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_halfhr\_scaled))}
-\CommentTok{\# Training and testing counter }
+\CommentTok{\# Training and testing counter}
 \NormalTok{train\_counter\_halfhr }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr]}
 \NormalTok{test\_counter\_halfhr }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr)]}
 \CommentTok{\# Training and testing features}
-\NormalTok{halfhr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr,] }\SpecialCharTok{\%\textgreater{}\%} 
+\NormalTok{halfhr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr,] }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
-\NormalTok{halfhr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr),] }\SpecialCharTok{\%\textgreater{}\%} 
+\NormalTok{halfhr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_halfhr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_halfhr),] }\SpecialCharTok{\%\textgreater{}\%}
   \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
 \end{Highlighting}
 \end{Shaded}
@@ -457,20 +568,20 @@ the five social classes.
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# Range of lambda values}
-\NormalTok{lambda\_values }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\FloatTok{0.01}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{length.out =} \DecValTok{10}\NormalTok{) }\SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(halfhr\_features\_train)}
+\NormalTok{lambda\_values\_halfhr }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\FloatTok{0.01}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{length.out =} \DecValTok{10}\NormalTok{) }\SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(halfhr\_features\_train)}
 
 \CommentTok{\# lapply over social classes}
 \NormalTok{halfhr\_ridge\_results }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
 \NormalTok{  y\_class }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_features\_train[[}\FunctionTok{as.character}\NormalTok{(class)]]}
   \CommentTok{\# Perform cross{-}validation}
 \NormalTok{  cv\_results }\OtherTok{\textless{}{-}} \FunctionTok{parallel\_ridge\_cross\_validation}\NormalTok{(}
-    \AttributeTok{x\_vars =} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_train[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_train)]), }
+    \AttributeTok{x\_vars =} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_train[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_train)]),}
     \AttributeTok{y\_var =}\NormalTok{ y\_class,}
-    \AttributeTok{time\_counter =}\NormalTok{ train\_counter\_halfhr, }
+    \AttributeTok{time\_counter =}\NormalTok{ train\_counter\_halfhr,}
     \AttributeTok{daily\_period =} \DecValTok{48}\NormalTok{,}
     \AttributeTok{annual\_period =} \DecValTok{48} \SpecialCharTok{*} \DecValTok{365}\NormalTok{,}
-    \AttributeTok{max\_K =} \DecValTok{5}\NormalTok{,}
-    \AttributeTok{lambda\_values =}\NormalTok{ lambda\_values,}
+    \AttributeTok{max\_K =} \DecValTok{7}\NormalTok{,}
+    \AttributeTok{lambda\_values =}\NormalTok{ lambda\_values\_halfhr,}
     \AttributeTok{n\_folds =} \DecValTok{10}
 \NormalTok{  )}
   \FunctionTok{return}\NormalTok{(cv\_results)}
@@ -478,9 +589,12 @@ the five social classes.
 \FunctionTok{names}\NormalTok{(halfhr\_ridge\_results) }\OtherTok{\textless{}{-}}\NormalTok{ soc\_classes}
 
 \CommentTok{\# Get predictions for each model on the test set}
-\NormalTok{halfhr\_ridge\_preds }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(halfhr\_ridge\_results, }\ControlFlowTok{function}\NormalTok{(cv\_results) \{}
+\NormalTok{halfhr\_x\_test }\OtherTok{\textless{}{-}} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_test[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_test)])}
+\NormalTok{halfhr\_ridge\_preds }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_ridge\_results[[}\FunctionTok{as.character}\NormalTok{(class)]]}
 \NormalTok{  preds }\OtherTok{\textless{}{-}} \FunctionTok{predict\_parallel\_ridge\_cv}\NormalTok{(}\AttributeTok{model =}\NormalTok{ cv\_results,}
-                                     \AttributeTok{x\_test =} \FunctionTok{as.matrix}\NormalTok{(halfhr\_features\_test[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(halfhr\_features\_test)]),}
+                                     \AttributeTok{x\_test =}\NormalTok{ halfhr\_x\_test,}
+                                     \AttributeTok{y\_test =}\NormalTok{ halfhr\_features\_test[[}\FunctionTok{as.character}\NormalTok{(class)]],}
                                      \AttributeTok{time\_counter =}\NormalTok{ test\_counter\_halfhr,}
                                      \AttributeTok{daily\_period =} \DecValTok{48}\NormalTok{,}
                                      \AttributeTok{annual\_period =} \DecValTok{48} \SpecialCharTok{*} \DecValTok{365}\NormalTok{)}
@@ -494,31 +608,61 @@ We can now visualize the predictions on the testing set:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\FunctionTok{library}\NormalTok{(patchwork)}
 \CommentTok{\# Dataframe of true values and predictions on test set}
-\NormalTok{halfhr\_test\_true\_preds }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_features\_test }\SpecialCharTok{\%\textgreater{}\%} 
-  \FunctionTok{select}\NormalTok{(dateTime, }\FunctionTok{all\_of}\NormalTok{(soc\_classes)) }\SpecialCharTok{\%\textgreater{}\%} 
+\NormalTok{halfhr\_test\_true\_preds }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_features\_test }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(dateTime, }\FunctionTok{all\_of}\NormalTok{(soc\_classes)) }\SpecialCharTok{\%\textgreater{}\%}
   \CommentTok{\# Add predictions}
-  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(halfhr\_ridge\_preds))}
+  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(halfhr\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{predictions)))}
 
 \CommentTok{\# Plot the predictions for each social class}
 \CommentTok{\# Arrange in a grid}
 \NormalTok{halfhr\_ridge\_plots }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
 \ControlFlowTok{for}\NormalTok{ (class }\ControlFlowTok{in} \FunctionTok{as.character}\NormalTok{(soc\_classes)) \{}
-\NormalTok{  plot\_title }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"Half{-}hourly demand predictions for"}\NormalTok{, class)}
+\NormalTok{  best\_K }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_K}
+\NormalTok{  best\_lambda }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_lambda}
+\NormalTok{  plot\_title }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"Half{-}hourly predictions for"}\NormalTok{, class)}
+\NormalTok{  plot\_subtitle }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{"Best K: "}\NormalTok{, best\_K, }\StringTok{"; Best lambda: "}\NormalTok{, best\_lambda)}
 \NormalTok{  p }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(halfhr\_test\_true\_preds, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime)) }\SpecialCharTok{+}
     \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[class]]), }\AttributeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\SpecialCharTok{+}
     \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[}\FunctionTok{paste0}\NormalTok{(class, }\StringTok{"\_preds"}\NormalTok{)]]), }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
-    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ plot\_title, }\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ plot\_title, }\AttributeTok{subtitle =}\NormalTok{ plot\_subtitle, }\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{) }\SpecialCharTok{+}
     \FunctionTok{theme\_bw}\NormalTok{()}
 \NormalTok{  halfhr\_ridge\_plots[[class]] }\OtherTok{\textless{}{-}}\NormalTok{ p}
 \NormalTok{\}}
-\NormalTok{combined\_halfhr\_ridge\_plot }\OtherTok{\textless{}{-}} \FunctionTok{wrap\_plots}\NormalTok{(halfhr\_ridge\_plots, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{)}
-\NormalTok{combined\_halfhr\_ridge\_plot}
+
+\FunctionTok{do.call}\NormalTok{(gridExtra}\SpecialCharTok{::}\NormalTok{grid.arrange, }\FunctionTok{c}\NormalTok{(halfhr\_ridge\_plots, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{))}
 \end{Highlighting}
 \end{Shaded}
 
-\includegraphics{main_files/figure-latex/unnamed-chunk-9-1.pdf}
+\includegraphics{main_files/figure-latex/unnamed-chunk-12-1.pdf}
+
+We can also examine the MSE on the test set for each class:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{halfhr\_mse }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(halfhr\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{error)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{pivot\_longer}\NormalTok{(}\AttributeTok{cols =} \FunctionTok{everything}\NormalTok{(), }\AttributeTok{names\_to =} \StringTok{"class"}\NormalTok{, }\AttributeTok{values\_to =} \StringTok{"halfhr\_MSE"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%} 
+  \CommentTok{\# Remove \_preds suffix from class column}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{class =} \FunctionTok{gsub}\NormalTok{(}\StringTok{"\_preds"}\NormalTok{, }\StringTok{""}\NormalTok{, class))}
+
+\NormalTok{kableExtra}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(halfhr\_mse,}
+                  \AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Class"}\NormalTok{, }\StringTok{"Half hour: MSE"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lr@{}}
+\toprule\noalign{}
+Class & Half hour: MSE \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+DE & 0.3694325 \\
+C1 & 0.3420719 \\
+C2 & 0.4233343 \\
+AB & 0.3700491 \\
+F & 0.6311342 \\
+\end{longtable}
 
 \hypertarget{hour}{%
 \subsubsection{Hour}\label{hour}}
@@ -530,12 +674,116 @@ Split the dataset into training and testing sets:
 \CommentTok{\# Split the data into training and test sets}
 \CommentTok{\# 90\% training set}
 \NormalTok{n\_train\_hr }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_hr\_scaled))}
-\NormalTok{hr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr,]}
+\CommentTok{\# Training and testing counter}
 \NormalTok{train\_counter\_hr }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr]}
-\NormalTok{hr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr),]}
 \NormalTok{test\_counter\_hr }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr)]}
+\CommentTok{\# Training and testing features}
+\NormalTok{hr\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr,] }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
+\NormalTok{hr\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_hr\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_hr),] }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
 \end{Highlighting}
 \end{Shaded}
+
+Perform cross-validation:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Range of lambda values}
+\NormalTok{lambda\_values\_hr }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\FloatTok{0.01}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{length.out =} \DecValTok{10}\NormalTok{) }\SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(hr\_features\_train)}
+\CommentTok{\# lapply over social classes}
+\NormalTok{hr\_ridge\_results }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  y\_class }\OtherTok{\textless{}{-}}\NormalTok{ hr\_features\_train[[}\FunctionTok{as.character}\NormalTok{(class)]]}
+  \CommentTok{\# Perform cross{-}validation}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}} \FunctionTok{parallel\_ridge\_cross\_validation}\NormalTok{(}
+    \AttributeTok{x\_vars =} \FunctionTok{as.matrix}\NormalTok{(hr\_features\_train[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(hr\_features\_train)]),}
+    \AttributeTok{y\_var =}\NormalTok{ y\_class,}
+    \AttributeTok{time\_counter =}\NormalTok{ train\_counter\_hr,}
+    \AttributeTok{daily\_period =} \DecValTok{24}\NormalTok{,}
+    \AttributeTok{annual\_period =} \DecValTok{24} \SpecialCharTok{*} \DecValTok{365}\NormalTok{,}
+    \AttributeTok{max\_K =} \DecValTok{7}\NormalTok{,}
+    \AttributeTok{lambda\_values =}\NormalTok{ lambda\_values\_hr,}
+    \AttributeTok{n\_folds =} \DecValTok{10}
+\NormalTok{  )}
+  \FunctionTok{return}\NormalTok{(cv\_results)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(hr\_ridge\_results) }\OtherTok{\textless{}{-}}\NormalTok{ soc\_classes}
+
+\CommentTok{\# Get predictions for each model on the test set}
+\NormalTok{hr\_x\_test }\OtherTok{\textless{}{-}} \FunctionTok{as.matrix}\NormalTok{(hr\_features\_test[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(hr\_features\_test)])}
+\NormalTok{hr\_ridge\_preds }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}}\NormalTok{ hr\_ridge\_results[[}\FunctionTok{as.character}\NormalTok{(class)]]}
+\NormalTok{  preds }\OtherTok{\textless{}{-}} \FunctionTok{predict\_parallel\_ridge\_cv}\NormalTok{(}\AttributeTok{model =}\NormalTok{ cv\_results,}
+                                     \AttributeTok{x\_test =}\NormalTok{ hr\_x\_test,}
+                                     \AttributeTok{y\_test =}\NormalTok{ hr\_features\_test[[}\FunctionTok{as.character}\NormalTok{(class)]],}
+                                     \AttributeTok{time\_counter =}\NormalTok{ test\_counter\_hr,}
+                                     \AttributeTok{daily\_period =} \DecValTok{24}\NormalTok{,}
+                                     \AttributeTok{annual\_period =} \DecValTok{24} \SpecialCharTok{*} \DecValTok{365}\NormalTok{)}
+  \FunctionTok{return}\NormalTok{(preds)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(hr\_ridge\_preds) }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(soc\_classes, }\StringTok{"\_preds"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+Visualize the predictions on the testing set:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Dataframe of true values and predictions on test set}
+\NormalTok{hr\_test\_true\_preds }\OtherTok{\textless{}{-}}\NormalTok{ hr\_features\_test }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(dateTime, }\FunctionTok{all\_of}\NormalTok{(soc\_classes)) }\SpecialCharTok{\%\textgreater{}\%}
+  \CommentTok{\# Add predictions}
+  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(hr\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{predictions)))}
+
+\CommentTok{\# Plot the predictions for each social class}
+\CommentTok{\# Arrange in a grid}
+\NormalTok{hr\_ridge\_plots }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
+\ControlFlowTok{for}\NormalTok{ (class }\ControlFlowTok{in} \FunctionTok{as.character}\NormalTok{(soc\_classes)) \{}
+\NormalTok{  best\_K }\OtherTok{\textless{}{-}}\NormalTok{ hr\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_K}
+\NormalTok{  best\_lambda }\OtherTok{\textless{}{-}}\NormalTok{ hr\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_lambda}
+\NormalTok{  plot\_title }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"Hourly predictions for"}\NormalTok{, class)}
+\NormalTok{  plot\_subtitle }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{"Best K: "}\NormalTok{, best\_K, }\StringTok{"; Best lambda: "}\NormalTok{, best\_lambda)}
+\NormalTok{  p }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(hr\_test\_true\_preds, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime)) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[class]]), }\AttributeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[}\FunctionTok{paste0}\NormalTok{(class, }\StringTok{"\_preds"}\NormalTok{)]]), }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ plot\_title, }\AttributeTok{subtitle =}\NormalTok{ plot\_subtitle, }\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{theme\_bw}\NormalTok{()}
+\NormalTok{  hr\_ridge\_plots[[class]] }\OtherTok{\textless{}{-}}\NormalTok{ p}
+\NormalTok{\}}
+
+\FunctionTok{do.call}\NormalTok{(gridExtra}\SpecialCharTok{::}\NormalTok{grid.arrange, }\FunctionTok{c}\NormalTok{(hr\_ridge\_plots, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-16-1.pdf}
+
+Test set MSE:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{hr\_mse }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(hr\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{error)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{pivot\_longer}\NormalTok{(}\AttributeTok{cols =} \FunctionTok{everything}\NormalTok{(), }\AttributeTok{names\_to =} \StringTok{"class"}\NormalTok{, }\AttributeTok{values\_to =} \StringTok{"hr\_MSE"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%} 
+  \CommentTok{\# Remove \_preds suffix from class column}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{class =} \FunctionTok{gsub}\NormalTok{(}\StringTok{"\_preds"}\NormalTok{, }\StringTok{""}\NormalTok{, class))}
+
+\NormalTok{kableExtra}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(hr\_mse,}
+                  \AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Class"}\NormalTok{, }\StringTok{"Hour: MSE"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lr@{}}
+\toprule\noalign{}
+Class & Hour: MSE \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+DE & 0.3667395 \\
+C1 & 0.3387109 \\
+C2 & 0.4194126 \\
+AB & 0.3653035 \\
+F & 0.6220024 \\
+\end{longtable}
 
 \hypertarget{day}{%
 \subsubsection{Day}\label{day}}
@@ -547,12 +795,175 @@ Split the dataset into training and testing sets:
 \CommentTok{\# Split the data into training and test sets}
 \CommentTok{\# 90\% training set}
 \NormalTok{n\_train\_day }\OtherTok{\textless{}{-}} \FunctionTok{round}\NormalTok{(}\FloatTok{0.9}\SpecialCharTok{*}\FunctionTok{nrow}\NormalTok{(df\_day\_scaled))}
-\NormalTok{day\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day,]}
+\CommentTok{\# Training and testing counter}
 \NormalTok{train\_counter\_day }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day]}
-\NormalTok{day\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day),]}
 \NormalTok{test\_counter\_day }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled}\SpecialCharTok{$}\NormalTok{counter[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day)]}
+\CommentTok{\# Training and testing features}
+\NormalTok{day\_features\_train }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day,] }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
+\NormalTok{day\_features\_test }\OtherTok{\textless{}{-}}\NormalTok{ df\_day\_scaled[}\SpecialCharTok{{-}}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{n\_train\_day),] }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{{-}}\NormalTok{counter)}
 \end{Highlighting}
 \end{Shaded}
+
+Perform cross-validation:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Range of lambda values}
+\NormalTok{lambda\_values\_day }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\FloatTok{0.01}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{length.out =} \DecValTok{10}\NormalTok{) }\SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(day\_features\_train)}
+\CommentTok{\# lapply over social classes}
+\NormalTok{day\_ridge\_results }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  y\_class }\OtherTok{\textless{}{-}}\NormalTok{ day\_features\_train[[}\FunctionTok{as.character}\NormalTok{(class)]]}
+  \CommentTok{\# Perform cross{-}validation}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}} \FunctionTok{parallel\_ridge\_cross\_validation}\NormalTok{(}
+    \AttributeTok{x\_vars =} \FunctionTok{as.matrix}\NormalTok{(day\_features\_train[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(day\_features\_train)]), }
+    \AttributeTok{y\_var =}\NormalTok{ y\_class,}
+    \AttributeTok{time\_counter =}\NormalTok{ train\_counter\_day, }
+    \AttributeTok{daily\_period =} \DecValTok{1}\NormalTok{,}
+    \AttributeTok{annual\_period =} \DecValTok{365}\NormalTok{,}
+    \AttributeTok{max\_K =} \DecValTok{7}\NormalTok{,}
+    \AttributeTok{lambda\_values =}\NormalTok{ lambda\_values\_day,}
+    \AttributeTok{n\_folds =} \DecValTok{10}
+\NormalTok{  )}
+  \FunctionTok{return}\NormalTok{(cv\_results)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(day\_ridge\_results) }\OtherTok{\textless{}{-}}\NormalTok{ soc\_classes}
+
+\CommentTok{\# Get predictions for each model on the test set}
+\NormalTok{day\_x\_test }\OtherTok{\textless{}{-}} \FunctionTok{as.matrix}\NormalTok{(day\_features\_test[,}\DecValTok{7}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(day\_features\_test)])}
+\NormalTok{day\_ridge\_preds }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(soc\_classes, }\ControlFlowTok{function}\NormalTok{(class) \{}
+\NormalTok{  cv\_results }\OtherTok{\textless{}{-}}\NormalTok{ day\_ridge\_results[[}\FunctionTok{as.character}\NormalTok{(class)]]}
+\NormalTok{  preds }\OtherTok{\textless{}{-}} \FunctionTok{predict\_parallel\_ridge\_cv}\NormalTok{(}\AttributeTok{model =}\NormalTok{ cv\_results,}
+                                     \AttributeTok{x\_test =}\NormalTok{ day\_x\_test,}
+                                     \AttributeTok{y\_test =}\NormalTok{ day\_features\_test[[}\FunctionTok{as.character}\NormalTok{(class)]],}
+                                     \AttributeTok{time\_counter =}\NormalTok{ test\_counter\_day,}
+                                     \AttributeTok{daily\_period =} \DecValTok{1}\NormalTok{,}
+                                     \AttributeTok{annual\_period =} \DecValTok{365}\NormalTok{)}
+  \FunctionTok{return}\NormalTok{(preds)}
+\NormalTok{\})}
+\FunctionTok{names}\NormalTok{(day\_ridge\_preds) }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(soc\_classes, }\StringTok{"\_preds"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+Visualize the predictions on the testing set:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Dataframe of true values and predictions on test set}
+\NormalTok{day\_test\_true\_preds }\OtherTok{\textless{}{-}}\NormalTok{ day\_features\_test }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(dateTime, }\FunctionTok{all\_of}\NormalTok{(soc\_classes)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \CommentTok{\# Add predictions}
+  \FunctionTok{bind\_cols}\NormalTok{(}\FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(day\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{predictions)))}
+
+\CommentTok{\# Plot the predictions for each social class}
+\CommentTok{\# Arrange in a grid}
+\NormalTok{day\_ridge\_plots }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
+\ControlFlowTok{for}\NormalTok{ (class }\ControlFlowTok{in} \FunctionTok{as.character}\NormalTok{(soc\_classes)) \{}
+\NormalTok{  best\_K }\OtherTok{\textless{}{-}}\NormalTok{ day\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_K}
+\NormalTok{  best\_lambda }\OtherTok{\textless{}{-}}\NormalTok{ day\_ridge\_results[[class]]}\SpecialCharTok{$}\NormalTok{best\_lambda}
+\NormalTok{  plot\_title }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"Daily predictions for"}\NormalTok{, class)}
+\NormalTok{  plot\_subtitle }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{"Best K: "}\NormalTok{, best\_K, }\StringTok{"; Best lambda: "}\NormalTok{, best\_lambda)}
+\NormalTok{  p }\OtherTok{\textless{}{-}} \FunctionTok{ggplot}\NormalTok{(day\_test\_true\_preds, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ dateTime)) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[class]]), }\AttributeTok{color =} \StringTok{"\#414141"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{y =}\NormalTok{ .data[[}\FunctionTok{paste0}\NormalTok{(class, }\StringTok{"\_preds"}\NormalTok{)]]), }\AttributeTok{color =} \StringTok{"red"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{labs}\NormalTok{(}\AttributeTok{title =}\NormalTok{ plot\_title, }\AttributeTok{subtitle =}\NormalTok{ plot\_subtitle, }\AttributeTok{x =} \StringTok{"Date"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Demand"}\NormalTok{) }\SpecialCharTok{+}
+    \FunctionTok{theme\_bw}\NormalTok{()}
+\NormalTok{  day\_ridge\_plots[[class]] }\OtherTok{\textless{}{-}}\NormalTok{ p}
+\NormalTok{\}}
+
+\FunctionTok{do.call}\NormalTok{(gridExtra}\SpecialCharTok{::}\NormalTok{grid.arrange, }\FunctionTok{c}\NormalTok{(day\_ridge\_plots, }\AttributeTok{ncol =} \DecValTok{2}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-20-1.pdf}
+
+Test set MSE:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{day\_mse }\OtherTok{\textless{}{-}} \FunctionTok{as.data.frame}\NormalTok{(}\FunctionTok{lapply}\NormalTok{(day\_ridge\_preds, }\ControlFlowTok{function}\NormalTok{(x) x}\SpecialCharTok{$}\NormalTok{error)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{pivot\_longer}\NormalTok{(}\AttributeTok{cols =} \FunctionTok{everything}\NormalTok{(), }\AttributeTok{names\_to =} \StringTok{"class"}\NormalTok{, }\AttributeTok{values\_to =} \StringTok{"day\_MSE"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%} 
+  \CommentTok{\# Remove \_preds suffix from class column}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{class =} \FunctionTok{gsub}\NormalTok{(}\StringTok{"\_preds"}\NormalTok{, }\StringTok{""}\NormalTok{, class))}
+
+\NormalTok{kableExtra}\SpecialCharTok{::}\FunctionTok{kable}\NormalTok{(day\_mse,}
+                  \AttributeTok{col.names =} \FunctionTok{c}\NormalTok{(}\StringTok{"Class"}\NormalTok{, }\StringTok{"Day: MSE"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lr@{}}
+\toprule\noalign{}
+Class & Day: MSE \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+DE & 1.0626297 \\
+C1 & 0.8228464 \\
+C2 & 1.2300408 \\
+AB & 0.8436411 \\
+F & 1.7203134 \\
+\end{longtable}
+
+\hypertarget{conclusions}{%
+\subsection{Conclusions}\label{conclusions}}
+
+For half-hourly and hourly data, ridge regression captures the general
+pattern of daily fluctuation for each social class, but the models fail
+to capture the maximum daily peaks in the testing set.
+
+The model has very poor performance at the day resolution across all
+social classes. In certain classes, the predictions show peaks in demand
+located at the same dates as in the true demand data, but the
+predictions are far too low.
+
+We can compare the performance of the ridge regression models between
+the social classes as well:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{overall\_ridge\_mse }\OtherTok{\textless{}{-}}\NormalTok{ halfhr\_mse }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{left\_join}\NormalTok{(hr\_mse, }\AttributeTok{by =} \StringTok{"class"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{left\_join}\NormalTok{(day\_mse, }\AttributeTok{by =} \StringTok{"class"}\NormalTok{)}
+
+\NormalTok{overall\_ridge\_mse }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{pivot\_longer}\NormalTok{(}\AttributeTok{cols =} \SpecialCharTok{{-}}\NormalTok{class, }\AttributeTok{names\_to =} \StringTok{"time\_scale"}\NormalTok{, }\AttributeTok{values\_to =} \StringTok{"MSE"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{mutate}\NormalTok{(}\AttributeTok{time\_scale =} \FunctionTok{gsub}\NormalTok{(}\StringTok{"\_MSE"}\NormalTok{, }\StringTok{""}\NormalTok{, time\_scale)) }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{ggplot}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ class, }\AttributeTok{y =}\NormalTok{ MSE, }\AttributeTok{fill =}\NormalTok{ time\_scale)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_bar}\NormalTok{(}\AttributeTok{stat =} \StringTok{"identity"}\NormalTok{, }\AttributeTok{position =} \StringTok{"dodge"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}\AttributeTok{x =} \StringTok{"Social class"}\NormalTok{, }\AttributeTok{y =} \StringTok{"Ridge regression MSE"}\NormalTok{, }\AttributeTok{fill =} \StringTok{"Time scale"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_bw}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-22-1.pdf}
+
+We see that the half-hourly and hourly models yield similar MSE values
+for all social class, while the day models always have higher MSEs. For
+all time scales, the models on class F have the worst performance. Class
+F contained the fewest households by far, perhaps accounting for the
+poor performance of the models.
+
+Some of the performance issues may be due to the way we implemented
+cross-validation, which is a key limitation of our work here. As we
+perform cross-validation naively, an implicit assumption of
+cross-validation is that the data is i.i.d. (independent and identically
+distributed), which is clearly not the case for time-series data. To see
+this, observe that in our setting, when the validation fold is taken in
+the middle of the time-series data, we are essentially performing
+interpolation, as the model will have knowledge of the future (with
+reference to the validation fold). One possible way to mitigate this
+issue is to use look-ahead validation, which only limits training folds
+to past data, and validation fold to one-step ahead forecasts. However,
+in general, cross-validation in time-series data is a challenging issue,
+and with reference to \href{https://arxiv.org/pdf/1905.11744}{Cerquiera
+et al., 2019}, does not currently have a clearly settled methodology for
+evaluation.
+
+Our cross-validation procedure almost always selected the maximum number
+of Fourier terms \(K\), except for the daily resolution, and always
+selected the lowest provided \(\lambda\) value.
 
 \hypertarget{gaussian-process-regression}{%
 \section{Gaussian Process
@@ -725,7 +1136,7 @@ found in \texttt{gauss\_process\_reg.R}:
 \NormalTok{  test\_set }\OtherTok{\textless{}{-}}\NormalTok{ data[(train\_index }\SpecialCharTok{+} \DecValTok{1}\NormalTok{)}\SpecialCharTok{:}\FunctionTok{nrow}\NormalTok{(data), ]}
 
   \CommentTok{\# Define the Gaussian process model}
-\NormalTok{  gpr\_model }\OtherTok{\textless{}{-}}\NormalTok{ kernlab}\SpecialCharTok{::}\FunctionTok{gausspr}\NormalTok{(}\FunctionTok{as.matrix}\NormalTok{(train\_set[, }\FunctionTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
+\NormalTok{  gpr\_model }\OtherTok{\textless{}{-}}\NormalTok{ kernlab}\SpecialCharTok{::}\FunctionTok{gausspr}\NormalTok{(}\FunctionTok{as.matrix}\NormalTok{(train\_set[,}\FunctionTok{c}\NormalTok{(}\StringTok{"toy"}\NormalTok{, }\StringTok{"temp"}\NormalTok{)]),}
                                 \FunctionTok{as.vector}\NormalTok{(train\_set[[class]]),}
                                 \AttributeTok{kernel =}\NormalTok{ kernel, }\AttributeTok{kpar =} \FunctionTok{list}\NormalTok{(}\AttributeTok{sigma =}\NormalTok{ sigma))}
 
@@ -761,6 +1172,146 @@ found in \texttt{gauss\_process\_reg.R}:
 \end{Shaded}
 
 \hypertarget{results-1}{%
-\section{Results}\label{results-1}}
+\subsection{Results}\label{results-1}}
+
+Our initial attempt to maximise the likelihood performed extremely
+slowly on the half-hourly and hourly data, so for time we elected to
+reduce the range of data to the first week of the year, then predicting
+the last 10\% of the week. This was much faster and the solution was
+found in around the same amount of time as the daily data. The optimal
+hyperparameters were:
+
+\begin{itemize}
+\tightlist
+\item
+  Half-hourly: \(l = 0.01, \sigma = 1562\)
+\item
+  Hourly: \(l = 0.5, \sigma = 92\)
+\item
+  Daily: \(l = 1, \sigma = 104\)
+\end{itemize}
+
+We then ran the Gaussian Process Regression model on the three datasets.
+We can see the results below:
+
+\hypertarget{aggregated-daily-data}{%
+\subsubsection{Aggregated Daily Data}\label{aggregated-daily-data}}
+
+Considering the daily data aggregation removed a lot of the complexity
+of the model, the GPR had no trouble with a fit:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(jpeg)}
+\FunctionTok{library}\NormalTok{(grid)}
+\FunctionTok{library}\NormalTok{(cowplot)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'cowplot'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:lubridate':
+## 
+##     stamp
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{image\_files }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/day\_AB.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/day\_C1.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/day\_C2.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/day\_DE.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/day\_F.jpeg"}\NormalTok{))}
+
+\NormalTok{image\_to\_grob }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(image\_file) \{}
+\NormalTok{  img }\OtherTok{\textless{}{-}} \FunctionTok{readJPEG}\NormalTok{(image\_file)}
+  \FunctionTok{rasterGrob}\NormalTok{(img)}
+\NormalTok{\}}
+
+
+\NormalTok{all\_grobs }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(image\_files, image\_to\_grob)}
+
+\NormalTok{combined\_plot }\OtherTok{\textless{}{-}} \FunctionTok{plot\_grid}\NormalTok{(}\AttributeTok{plotlist =}\NormalTok{ all\_grobs,}\AttributeTok{ncol =} \DecValTok{2}\NormalTok{)}
+
+
+\FunctionTok{print}\NormalTok{(combined\_plot)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-26-1.pdf}
+
+Unfortunately, as a side affect of the gaussian kernel, we has
+considerable trail off at the end of the data. Meaning the \texttt{mse}
+on our test set is quite high. In terms of general fit for the training
+set it performs quite well - but without a meaningful performance metric
+we cannot confirm whether this is overfitting. This is a pattern we will
+see with the half-hourly and hourly data too.
+
+\hypertarget{aggregated-hourly-data}{%
+\subsubsection{Aggregated Hourly Data}\label{aggregated-hourly-data}}
+
+For hourly data, we can clearly see the daily cycles appearing,
+fortunately our GPR is able to get a pretty accurate fit, including the
+daily peaks of electricity consumption. The same \texttt{sigma} was
+applied to the yearly set (and can be found in the \texttt{data} file in
+the github rep) and it performed much worse, but that's to be expected.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{image\_files2 }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/hourWEEK\_AB.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/hourWEEK\_C1.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/hourWEEK\_C2.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/hourWEEK\_DE.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/hourWEEK\_F.jpeg"}\NormalTok{))}
+
+
+\NormalTok{all\_grobs2 }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(image\_files2, image\_to\_grob)}
+\NormalTok{combined\_plot2 }\OtherTok{\textless{}{-}} \FunctionTok{plot\_grid}\NormalTok{(}\AttributeTok{plotlist =}\NormalTok{ all\_grobs2,}\AttributeTok{ncol =} \DecValTok{2}\NormalTok{)}
+
+\FunctionTok{print}\NormalTok{(combined\_plot2)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-27-1.pdf}
+
+\hypertarget{aggregated-half-hourly-data}{%
+\subsubsection{Aggregated Half-Hourly
+Data}\label{aggregated-half-hourly-data}}
+
+Similarly to the hourly data, the half-hourly data has daily cycles, but
+with an additional peak early on in the day - perhaps the coronation
+street kettle myth in action?
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{image\_files3 }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/half\_hourWEEK\_AB.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/half\_hourWEEK\_C1.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/half\_hourWEEK\_C2.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/half\_hourWEEK\_DE.jpeg"}\NormalTok{),}
+\NormalTok{                  here}\SpecialCharTok{::}\FunctionTok{here}\NormalTok{(}\StringTok{"data/plots\_gpr/half\_hourWEEK\_F.jpeg"}\NormalTok{))}
+
+\NormalTok{all\_grobs3 }\OtherTok{\textless{}{-}} \FunctionTok{lapply}\NormalTok{(image\_files3, image\_to\_grob)}
+\NormalTok{combined\_plot3 }\OtherTok{\textless{}{-}} \FunctionTok{plot\_grid}\NormalTok{(}\AttributeTok{plotlist =}\NormalTok{ all\_grobs3,}\AttributeTok{ncol =} \DecValTok{2}\NormalTok{)}
+
+\FunctionTok{print}\NormalTok{(combined\_plot3)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{main_files/figure-latex/unnamed-chunk-28-1.pdf}
+
+\hypertarget{conclusions-1}{%
+\subsubsection{Conclusions}\label{conclusions-1}}
+
+Despite good fits on the cyclic data, the gaussian process regression
+has terrible predictive ability for the future. Further tests could be
+done to demonstrate its effectiveness on a random test set sampled from
+the data, which we predict it would perform much better on.
+
+\hypertarget{beeg-comparison}{%
+\section{BEEG COMPARISON}\label{beeg-comparison}}
 
 \end{document}

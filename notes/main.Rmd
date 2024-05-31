@@ -1,7 +1,7 @@
 ---
 title: "SC-2 Electric Boogalo"
 subtitle: "Regression on the Irish datset agregated by class"
-author: "Kieran Morris, Cecina Babich Morrow and Sherman Kjo"
+author: "Kieran Morris, Cecina Babich Morrow and Sherman Khoo"
 urlcolor: blue
 output:
     pdf_document:
@@ -153,12 +153,26 @@ Because this is time series data, we needed to make sure the training and testin
 
 # `ElecForecast` package
 
-**Insert short description of package, what it does, how to install it**
+We present a fully documented and tested package, `ElecForecast`, which is available on github [here](https://github.com/Shermjj/SC-2-Electric-Boogalo). The package binary is available [here](https://github.com/Shermjj/SC-2-Electric-Boogalo/blob/main/ElecForecast_1.0_R_x86_64-pc-linux-gnu.tar.gz), and can be used for installation, as we will show.
 
+To install the package binary, we can call the following function:
+```{r,eval=FALSE}
+install.packages("ElecForecast_1.0_R_x86_64-pc-linux-gnu.tar.gz", repos = NULL, type="source")
+```
+
+![Installation](~/docs/code/SC-2-Electric-Boogalo/notes/main_files/install.png)
+
+We can then load the package as with any other R package.
 ```{r}
 # Load our package
 library(ElecForecast)
 ```
+
+In order to view the documentation of this package, we can prepend `?` to any functions exposed in this package, for example:
+```{r, eval=FALSE}
+?GenFT
+```
+![Documentation](~/docs/code/SC-2-Electric-Boogalo/notes/main_files/docs.png)
 
 # Ridge Regression
 
@@ -506,9 +520,8 @@ overall_ridge_mse %>%
 
 We see that the half-hourly and hourly models yield similar MSE values for all social class, while the day models always have higher MSEs. For all time scales, the models on class F have the worst performance. Class F contained the fewest households by far, perhaps accounting for the poor performance of the models.
 
-Some of the performance issues may be due to the way we implemented cross-validation.
+Some of the performance issues may be due to the way we implemented cross-validation, which is a key limitation of our work here. As we perform cross-validation naively, an implicit assumption of cross-validation is that the data is i.i.d. (independent and identically distributed), which is clearly not the case for time-series data. To see this, observe that in our setting, when the validation fold is taken in the middle of the time-series data, we are essentially performing interpolation, as the model will have knowledge of the future (with reference to the validation fold). One possible way to mitigate this issue is to use look-ahead validation, which only limits training folds to past data, and validation fold to one-step ahead forecasts. However, in general, cross-validation in time-series data is a challenging issue, and with reference to [Cerquiera et al., 2019](https://arxiv.org/pdf/1905.11744), does not currently have a clearly settled methodology for evaluation. 
 
-**Insert limitations of CV for time series**
 
 Our cross-validation procedure almost always selected the maximum number of Fourier terms $K$, except for the daily resolution, and always selected the lowest provided $\lambda$ value.
 
