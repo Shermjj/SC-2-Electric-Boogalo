@@ -44,10 +44,8 @@ gaussian_process_reg <- function(data,
 
   # Evaluate performance
   test_mean_func <- predict(gpr_model, as.vector(test_set$counter))
-  performance <- postResample(pred = test_mean_func, obs = test_set$DE)
+  performance <- postResample(pred = test_mean_func, obs = test_set$DE)[["RMSE"]]^2
 
-  print(head(data_with_pred))
-  print("-------------------")
   # Include Plots ?
   if (plot){
     pl <- ggplot(data_with_pred, aes(x = counter)) +
@@ -60,7 +58,7 @@ gaussian_process_reg <- function(data,
   }
   return(list(model = gpr_model,
               data = data_with_pred,
-              performance,
+              performance = performance,
               plot = pl))
 }
 
@@ -91,8 +89,11 @@ class_colours <- c("DE" = "#ff0000",
                    "F" = "#45b828")
 
 
-for (class_name in class_names) {
-  df_hour <- df_hour[1:168,]
+
+save_gpr_data <- function(df,n){
+  all_plots <- list()
+  for (class_name in class_names) {
+  df_hour <- df_hour[1:n,]
    #Perform Gaussian Process Regression on the class
   gpr_result <- gaussian_process_reg(df_hour, class = class_name, plot = TRUE)
   df <- gpr_result$data
@@ -104,10 +105,9 @@ for (class_name in class_names) {
   all_plots[[class_name]] <- gpr_result$plot
 }
 
-# Initialize an empty list to store the plots
-all_plots <- list()
 
-# List of class names
+}
+
 class_names <- list("DE", "C1", "C2", "AB", "F")
 
 display_plots <- function(class_name) {
@@ -124,3 +124,19 @@ display_plots <- function(class_name) {
   # Return the plot
   return(p)
 }
+
+
+get_rmse <- function(class) {
+  perf <- gaussian_process_reg(df_day, class = class, plot = TRUE)$performance
+  return(data.frame(class = class, mse = perf))
+}
+
+class_names <- list("DE", "C1", "C2", "AB", "F")
+
+# Use lapply to get the RMSE for each class and combine the results into a data frame
+mse_results <- do.call(rbind, lapply(class_names, get_rmse))
+
+# Print the results
+print(mse_results)
+
+saveRDS(mse_results,)
